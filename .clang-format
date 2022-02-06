@@ -1,0 +1,42 @@
+# Version: clang-format-9
+# Reference:
+#   http://releases.llvm.org/9.0.0/tools/clang/docs/ClangFormatStyleOptions.html
+BasedOnStyle: Google
+AlignConsecutiveAssignments: true
+AlignConsecutiveMacros: true
+AllowShortFunctionsOnASingleLine: None
+AllowShortIfStatementsOnASingleLine: false
+AllowShortLoopsOnASingleLine: false
+
+AccessModifierOffset: -4
+
+AllowAllArgumentsOnNextLine: false
+BinPackArguments: false
+AllowAllParametersOfDeclarationOnNextLine: false
+BinPackParameters: false
+
+# When ColumnLimit=0, then AlwaysBreakAfterReturnType is only
+# enforced if return type is 'void'
+ColumnLimit: 120
+
+DerivePointerAlignment: false
+PointerAlignment: Right
+
+KeepEmptyLinesAtTheStartOfBlocks: true
+
+IncludeBlocks: Preserve
+IndentWidth: 4
+
+ReflowComments: false
+SpacesBeforeTrailingComments: 1
+
+---
+Language: Proto
+AlignConsecutiveAssignments : true
+AlignOperands : true
+AlignTrailingComments: true
+DisableFormat: false
+ColumnLimit : 80
+TabWidth: 4
+IndentWidth: 4
+---
