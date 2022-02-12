@@ -17,69 +17,141 @@ void Cpu::reset() {
     this->pc    = 0x100;
 }
 
-void Cpu::do_instruction(Bus &bus) {
+uint8_t &Cpu::decode_reg(uint8_t bits) {
+    switch(bits) {
+    case 0:
+        return this->b;
+    case 1:
+        return this->c;
+    case 2:
+        return this->d;
+    case 3:
+        return this->e;
+    case 4:
+        return this->h;
+    case 5:
+        return this->l;
+    default: // 6
+        return this->a;
+    }
+}
 
-    auto opcode = bus.read(this->pc);
-    fmt::print("Read opcode: ${:02X} -> ", opcode);
-    switch (opcode) {
+std::string Cpu::decode_reg_name(uint8_t bits) const {
+    switch(bits) {
+    case 0:
+        return "B";
+    case 1:
+        return "C";
+    case 2:
+        return "D";
+    case 3:
+        return "E";
+    case 4:
+        return "H";
+    case 5:
+        return "L";
+    default: // 6
+        return "A";
+    }
+}
+
+void Cpu::do_tick(Bus &bus) {
+
+    if(this->cycle == 0) {
+        this->opcode = bus.read(this->pc);
+        fmt::print("\t\t\t\t\t\t\t\t\t read opcode: ${:02X} -> ", opcode);
+    }
+
+    switch (this->opcode) {
         case 0x00:
             fmt::print("NOP\n");
             this->pc += 1;
+            this->cycle = 0; // start over
             break;
 
         // LD
-        case 0x3E:
-            fmt::print("LD A, d8\n");
-            this->a = bus.read(this->pc + 1);
-            fmt::print("\t\t\t\t\t\t\t\t\t a set to ${:02X}\n", this->a);
-            this->pc += 2;
-            break;
-        case 0x06:
-            fmt::print("LD B, d8\n");
-            this->b = bus.read(this->pc + 1);
-            fmt::print("\t\t\t\t\t\t\t\t\t b set to ${:02X}\n", this->b);
-            this->pc += 2;
-            break;
-        case 0x0E:
-            fmt::print("LD C, d8\n");
-            this->c = bus.read(this->pc + 1);
-            fmt::print("\t\t\t\t\t\t\t\t\t c set to ${:02X}\n", this->c);
-            this->pc += 2;
-            break;
+        case 0x06: // LD B, d8    0000 0110
+        case 0x0E: // LD C, d8    0000 1110
+        case 0x16: // LD D, d8    0001 0110
+        case 0x1E: // LD E, d8    0001 1110
+        case 0x26: // LD H, d8    0010 0110
+        case 0x2E: // LD L, d8    0010 1110
+        case 0x3E: // LD A, d8    0011 1110
+        {
+            if (this->cycle == 0) {
+                const auto reg_name = decode_reg_name((this->opcode>>3)&0x7);
+                fmt::print("LD {}, d8\n", reg_name);
+                this->cycle++;
+            } else {
+                const auto reg_name = decode_reg_name((this->opcode>>3)&0x7);
+                auto &reg       = decode_reg((this->opcode>>3)&0x7);
+                reg             = bus.read(this->pc + 1);
+                fmt::print("\t\t\t\t\t\t\t\t\t {} set to ${:02X}\n", reg_name, reg);
+                this->pc += 2;
+                this->cycle = 0;
+            }
+        } break;
         case 0x21:
-            fmt::print("LD HL, d16\n");
-            this->l = bus.read(this->pc + 1);
-            this->h = bus.read(this->pc + 2);
-            fmt::print("\t\t\t\t\t\t\t\t\t hl set to ${:02X}{:02X}\n", this->h, this->l);
-            this->pc += 3;
+            if (this->cycle == 0) {
+                fmt::print("LD HL, d16\n");
+                this->cycle++;
+            } else if (this->cycle == 1) {
+                this->l = bus.read(this->pc + 1);
+                this->cycle++;
+            } else if (this->cycle == 2) {
+                this->h = bus.read(this->pc + 2);
+                fmt::print("\t\t\t\t\t\t\t\t\t hl set to ${:02X}{:02X}\n", this->h, this->l);
+                this->pc += 3;
+                this->cycle = 0;
+            }
             break;
-        case 0x32: {
-            fmt::print("LD (HL-), A\n");
-            uint16_t hl = this->l | (static_cast<uint16_t>(this->h) << 8);
-            bus.write(hl, this->a);
-            fmt::print("\t\t\t\t\t\t\t\t\t a (${:02X}) stored to (hl) (${:04X}), and hl decremented\n", this->a, hl);
-            hl--;
-            this->l = hl & 0xff;
-            this->h = (hl >> 8) & 0xff;
-            this->pc += 1;
+        case 0x32:
+            if (this->cycle == 0) {
+                fmt::print("LD (HL-), A\n");
+                this->cycle++;
+            } else if (this->cycle == 1) {
+                uint16_t hl = this->l | (static_cast<uint16_t>(this->h) << 8);
+                bus.write(hl, this->a);
+                fmt::print("\t\t\t\t\t\t\t\t\t a (${:02X}) stored to (hl) (${:04X}), and hl decremented\n",
+                           this->a,
+                           hl);
+                hl--;
+                this->l = hl & 0xff;
+                this->h = (hl >> 8) & 0xff;
+                this->pc += 1;
+                this->cycle = 0;
+            }
             break;
-        }
-        case 0xE0: {
-            fmt::print("LD (a8), A\n");
-            const uint16_t addr = 0xff00 | bus.read(this->pc+1);
-            fmt::print("\t\t\t\t\t\t\t\t\t a (${:02X}) stored to (${:04X})\n", this->a, addr);
-            bus.write(addr, this->a);
-            this->pc += 2;
+        case 0xE0:
+            if (this->cycle == 0) {
+                fmt::print("LD (a8), A\n");
+                this->cycle++;
+            } else if (this->cycle == 1) {
+                this->tmp1 = bus.read(this->pc + 1);
+                this->cycle++;
+            } else {
+                const uint16_t addr = 0xff00 | this->tmp1;
+                fmt::print("\t\t\t\t\t\t\t\t\t a (${:02X}) stored to (${:04X})\n", this->a, addr);
+                bus.write(addr, this->a);
+                this->pc += 2;
+                this->cycle = 0;
+            }
             break;
-        }
-        case 0xF0: {
-            fmt::print("LD A, (a8)\n");
-            const uint16_t addr = 0xff00 | bus.read(this->pc+1);
-            this->a = bus.read(addr);
-            fmt::print("\t\t\t\t\t\t\t\t\t a (${:02X}) read from (${:04X})\n", this->a, addr);
-            this->pc += 2;
+        case 0xF0:
+            if(this->cycle == 0) {
+                fmt::print("LD A, (a8)\n");
+                this->cycle++;
+            } else if (this->cycle == 1) {
+                this->tmp1 = bus.read(this->pc + 1);
+                this->cycle++;
+            } else {
+                const uint16_t addr = 0xff00 | this->tmp1;
+                this->a = bus.read(addr);
+                fmt::print("\t\t\t\t\t\t\t\t\t a (${:02X}) read from (${:04X})\n", this->a, addr);
+                this->pc += 2;
+                this->cycle = 0;
+            }
             break;
-        }
 
         //-------------------------------------------------------
         // ALU
@@ -92,82 +164,113 @@ void Cpu::do_instruction(Bus &bus) {
             this->pc += 1;
             break;
 
-        // INC / DEC
+        // DEC {B,C,D,E,H,L,A}
         case 0x05:
-            fmt::print("DEC B\n");
+        case 0x0D:
+        case 0x15:
+        case 0x1D:
+        case 0x25:
+        case 0x2D:
+        case 0x3D: {
+            // single cycle
+            const auto reg_name = decode_reg_name((this->opcode>>3)&0x7);
+            auto &reg = decode_reg((this->opcode>>3)&0x7);
 
-            this->b -= 1;
-            this->set_flag_z(this->b==0);
+            fmt::print("DEC {}\n", reg_name);
+
+            reg -= 1;
+            this->set_flag_z(reg==0);
             this->set_flag_n(true);
 
-            fmt::print("\t\t\t\t\t\t\t\t\t b decremented to ${:02X}\n", this->b);
+            fmt::print("\t\t\t\t\t\t\t\t\t {} decremented to ${:02X}\n", reg_name, reg);
 
             this->pc += 1;
             break;
-        case 0x0C:
-            fmt::print("INC C\n");
+        }
 
-            this->c += 1;
-            this->set_flag_z(this->c==0);
+        // INC {B,C,D,E,H,L,A}
+        case 0x04:
+        case 0x0C:
+        case 0x14:
+        case 0x1C:
+        case 0x24:
+        case 0x2C:
+        case 0x3C: {
+            // single cycle
+            const auto reg_name = decode_reg_name((this->opcode>>3)&0x7);
+            auto &reg = decode_reg((this->opcode>>3)&0x7);
+
+            fmt::print("INC {}\n", reg_name);
+
+            reg += 1;
+            this->set_flag_z(reg==0);
             this->set_flag_n(false);
 
-            fmt::print("\t\t\t\t\t\t\t\t\t c incremented to ${:02X}\n", this->c);
+            fmt::print("\t\t\t\t\t\t\t\t\t {} incremented to ${:02X}\n", reg_name, reg);
 
             this->pc += 1;
             break;
-        case 0x0D:
-            fmt::print("DEC C\n");
-
-            this->c -= 1;
-            this->set_flag_z(this->c==0);
-            this->set_flag_n(true);
-
-            fmt::print("\t\t\t\t\t\t\t\t\t c decremented to ${:02X}\n", this->c);
-
-            this->pc += 1;
-            break;
+        }
 
         // Comparison
-        case 0xFE: {
-            fmt::print("CP d8\n");
-
-            const auto val = bus.read(this->pc + 1);
-            this->set_flag_z(this->a == val);
-            this->set_flag_n(true);
-
-            fmt::print("\t\t\t\t\t\t\t\t\t a (${:02X}) compared to ${:02X}\n", this->a, val);
-
-            this->pc += 2;
-            break;
-        }
-
-        // jumps
-        case 0x20: {
-            fmt::print("JR NZ, s8\n");
-            int16_t offset = static_cast<int8_t>(bus.read(this->pc+1));
-            this->pc += 2;
-            if(!get_flag_z()) {
-                this->pc += offset;
-                fmt::print("\t\t\t\t\t\t\t\t\t relative jump taken with offset {} to ${:04X}\n", offset, this->pc);
+        case 0xFE:
+            if(this->cycle == 0) {
+                fmt::print("CP d8\n");
+                this->cycle++;
             } else {
-                fmt::print("\t\t\t\t\t\t\t\t\t relative jump NOT taken\n");
+                const auto val = bus.read(this->pc + 1);
+                this->set_flag_z(this->a == val);
+                this->set_flag_n(true);
+
+                fmt::print("\t\t\t\t\t\t\t\t\t a (${:02X}) compared to ${:02X}\n", this->a, val);
+
+                this->pc += 2;
+                this->cycle=0;
             }
             break;
-        }
-        case 0xC3: {
-            fmt::print("JP nn nn\n");
 
-            uint16_t addr_l = bus.read(this->pc + 1);
-            uint16_t addr_h = bus.read(this->pc + 2);
-            uint16_t new_pc = (addr_h << 8) | addr_l;
-            fmt::print("\t\t\t\t\t\t\t\t\t Jumping to: ${:04X}\n", new_pc);
-
-            this->pc = new_pc;
+        // jumps
+        case 0x20:
+            if(this->cycle == 0) {
+                fmt::print("JR NZ, s8\n");
+                this->cycle++;
+            } else if (this->cycle == 1) {
+                if(!get_flag_z()) {
+                    this->tmp1 = bus.read(this->pc+1);
+                    this->cycle++;
+                } else {
+                    fmt::print("\t\t\t\t\t\t\t\t\t relative jump NOT taken\n");
+                    this->pc += 2;
+                    this->cycle=0;
+                }
+            } else if (this->cycle == 2) {
+                const int16_t offset = static_cast<int8_t>(this->tmp1);
+                this->pc += offset+2; // extra 2 ?
+                fmt::print("\t\t\t\t\t\t\t\t\t relative jump taken with offset {} to ${:04X}\n", offset, this->pc);
+                this->cycle=0;
+            }
             break;
-        }
+        case 0xC3:
+            if(this->cycle == 0) {
+                fmt::print("JP nn nn\n");
+                this->cycle++;
+            } else if (this->cycle == 1) {
+                this->tmp1 = bus.read(this->pc + 1); // addr_l
+                this->cycle++;
+            } else if (this->cycle == 2) {
+                this->tmp2 = bus.read(this->pc + 2); // addr_h
+                this->cycle++;
+            } else if (this->cycle == 3) {
+                const uint16_t new_pc = (static_cast<uint16_t>(this->tmp2) << 8) | static_cast<uint16_t>(this->tmp1);
+                fmt::print("\t\t\t\t\t\t\t\t\t Jumping to: ${:04X}\n", new_pc);
+                this->pc = new_pc;
+                this->cycle = 0;
+            }
+            break;
 
         // interrupt stuff
         case 0xF3:
+            // single cycle
             fmt::print("DI\n");
             this->ime = false;
             fmt::print("\t\t\t\t\t\t\t\t\t All interrupts disabled\n");

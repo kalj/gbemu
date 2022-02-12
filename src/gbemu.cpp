@@ -169,7 +169,9 @@ int main(int argc, char **argv) {
     fmt::print("Starting execution\n\n");
 
     for(int i=0;;i++) {
-        cpu.do_instruction(bus);
+
+        fmt::print(" === [cycle = {}]\n", i);
+        cpu.do_tick(bus);
     }
 
     return 0;

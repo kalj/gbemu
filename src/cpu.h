@@ -2,13 +2,15 @@
 #define CPU_H
 
 #include <cstdint>
+#include <string>
 
 class Bus;
 
 class Cpu {
 public:
     void reset();
-    void do_instruction(Bus &bus);
+    void do_tick(Bus &bus);
+
     bool get_flag_z() const {
         return flags & 0x80;
     }
@@ -51,7 +53,12 @@ public:
         }
     }
 
+    uint8_t &decode_reg(uint8_t bits);
+    std::string decode_reg_name(uint8_t bits) const;
+
 private:
+
+    // registers
     uint8_t a{0};
     uint8_t flags{0};
     uint8_t b{0}, c{0};
@@ -60,6 +67,10 @@ private:
     uint16_t sp{0};
     uint16_t pc{0};
     bool ime{false};
+
+    int cycle{0};
+    uint8_t opcode{0};
+    uint8_t tmp1, tmp2; // storage between cpu cycles
 };
 
 #endif /* CPU_H */
