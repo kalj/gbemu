@@ -156,13 +156,23 @@ void Cpu::do_tick(Bus &bus) {
         //-------------------------------------------------------
         // ALU
         //-------------------------------------------------------
-        case 0xAF:
-            fmt::print("XOR A\n");
-            this->a = 0;
-            this->flags = 0x80; // this is always 0 to z flag is set, all else is 0
-            fmt::print("\t\t\t\t\t\t\t\t\t a cleared\n");
+        case 0xA8: // XOR B  1010 1000
+        case 0xA9: // XOR C  1010 1001
+        case 0xAA: // XOR D  1010 1010
+        case 0xAB: // XOR E  1010 1011
+        case 0xAC: // XOR H  1010 1100
+        case 0xAD: // XOR L  1010 1101
+        case 0xAF: // XOR A  1010 1111
+        {
+            const auto reg_name = decode_reg_name(this->opcode & 0x7);
+            auto &reg           = decode_reg(this->opcode & 0x7);
+
+            fmt::print("XOR {}\n", reg_name);
+            this->a     = this->a ^ reg;
+            this->flags = (this->a == 0) ? 0x80 : 0x00;
+            fmt::print("\t\t\t\t\t\t\t\t\t A = A XOR {} = ${:02X}\n", reg_name, this->a);
             this->pc += 1;
-            break;
+        } break;
 
         // DEC {B,C,D,E,H,L,A}
         case 0x05:
