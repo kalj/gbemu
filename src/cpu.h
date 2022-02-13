@@ -6,6 +6,13 @@
 
 class Bus;
 
+union reg {
+    uint16_t r16;
+    struct {
+        uint8_t lo, hi;
+    } r8;
+};
+
 class Cpu {
 public:
     void reset();
@@ -53,17 +60,20 @@ public:
         }
     }
 
-    uint8_t &decode_reg(uint8_t bits);
-    std::string decode_reg_name(uint8_t bits) const;
+    uint8_t &decode_reg8(uint8_t bits);
+    std::string decode_reg8_name(uint8_t bits) const;
+
+    uint16_t &decode_reg16(uint8_t bits);
+    std::string decode_reg16_name(uint8_t bits) const;
 
 private:
 
     // registers
     uint8_t a{0};
     uint8_t flags{0};
-    uint8_t b{0}, c{0};
-    uint8_t d{0}, e{0};
-    uint8_t h{0}, l{0};
+    reg bc{0};
+    reg de{0};
+    reg hl{0};
     uint16_t sp{0};
     uint16_t pc{0};
     bool ime{false};

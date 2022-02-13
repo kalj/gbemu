@@ -7,36 +7,33 @@
 void Cpu::reset() {
     this->a     = 0x01; // on GB/SGB. 0xff on GBP, 0x11 on GBC
     this->flags = 0xb0;
-    this->b     = 0x00; // on GB/SGB/GBP/GBC
-    this->c     = 0x13;
-    this->d     = 0x00;
-    this->e     = 0xd8;
-    this->h     = 0x01;
-    this->l     = 0x4d;
+    this->bc.r16 = 0x0013; // on GB/SGB/GBP/GBC
+    this->de.r16 = 0x00d8;
+    this->hl.r16 = 0x014d;
     this->sp    = 0xfffe;
-    this->pc    = 0x100;
+    this->pc    = 0x0100;
 }
 
-uint8_t &Cpu::decode_reg(uint8_t bits) {
+uint8_t &Cpu::decode_reg8(uint8_t bits) {
     switch(bits) {
     case 0:
-        return this->b;
+        return this->bc.r8.hi;
     case 1:
-        return this->c;
+        return this->bc.r8.lo;
     case 2:
-        return this->d;
+        return this->de.r8.hi;
     case 3:
-        return this->e;
+        return this->de.r8.lo;
     case 4:
-        return this->h;
+        return this->hl.r8.hi;
     case 5:
-        return this->l;
+        return this->hl.r8.lo;
     default: // 6
         return this->a;
     }
 }
 
-std::string Cpu::decode_reg_name(uint8_t bits) const {
+std::string Cpu::decode_reg8_name(uint8_t bits) const {
     switch(bits) {
     case 0:
         return "B";
@@ -52,6 +49,32 @@ std::string Cpu::decode_reg_name(uint8_t bits) const {
         return "L";
     default: // 6
         return "A";
+    }
+}
+
+uint16_t &Cpu::decode_reg16(uint8_t bits) {
+    switch(bits) {
+    case 0:
+        return this->bc.r16;
+    case 1:
+        return this->de.r16;
+    case 2:
+        return this->hl.r16;
+    default: // 3
+        return this->sp;
+    }
+}
+
+std::string Cpu::decode_reg16_name(uint8_t bits) const {
+    switch(bits) {
+    case 0:
+        return "BC";
+    case 1:
+        return "DE";
+    case 2:
+        return "HL";
+    default: // 3
+        return "SP";
     }
 }
 
@@ -79,12 +102,12 @@ void Cpu::do_tick(Bus &bus) {
         case 0x3E: // LD A, d8    0011 1110
         {
             if (this->cycle == 0) {
-                const auto reg_name = decode_reg_name((this->opcode>>3)&0x7);
+                const auto reg_name = decode_reg8_name((this->opcode>>3)&0x7);
                 fmt::print("LD {}, d8\n", reg_name);
                 this->cycle++;
             } else {
-                const auto reg_name = decode_reg_name((this->opcode>>3)&0x7);
-                auto &reg       = decode_reg((this->opcode>>3)&0x7);
+                const auto reg_name = decode_reg8_name((this->opcode>>3)&0x7);
+                auto &reg       = decode_reg8((this->opcode>>3)&0x7);
                 reg             = bus.read(this->pc + 1);
                 fmt::print("\t\t\t\t\t\t\t\t\t {} set to ${:02X}\n", reg_name, reg);
                 this->pc += 2;
@@ -100,11 +123,10 @@ void Cpu::do_tick(Bus &bus) {
                 this->tmp1 = bus.read(this->pc + 1);
                 this->cycle++;
             } else {
-                uint16_t hl = this->l | (static_cast<uint16_t>(this->h) << 8);
-                bus.write(hl, this->tmp1);
+                bus.write(this->hl.r16, this->tmp1);
                 fmt::print("\t\t\t\t\t\t\t\t\t ${:02X} stored to (hl) (${:04X})\n",
                            this->tmp1,
-                           hl);
+                           this->hl.r16);
 
                 this->pc += 2;
                 this->cycle = 0;
@@ -115,30 +137,35 @@ void Cpu::do_tick(Bus &bus) {
                 fmt::print("LD (HL-), A\n");
                 this->cycle++;
             } else if (this->cycle == 1) {
-                uint16_t hl = this->l | (static_cast<uint16_t>(this->h) << 8);
-                bus.write(hl, this->a);
+                bus.write(this->hl.r16, this->a);
                 fmt::print("\t\t\t\t\t\t\t\t\t a (${:02X}) stored to (hl) (${:04X}), and hl decremented\n",
                            this->a,
-                           hl);
-                hl--;
-                this->l = hl & 0xff;
-                this->h = (hl >> 8) & 0xff;
+                           this->hl.r16);
+                this->hl.r16--;
                 this->pc += 1;
                 this->cycle = 0;
             }
             break;
 
         // 16-bit register load
-        case 0x21:
+        case 0x01: // LD BC, d16
+        case 0x11: // LD DE, d16
+        case 0x21: // LD HL, d16
+        case 0x31: // LD SP, d16
             if (this->cycle == 0) {
-                fmt::print("LD HL, d16\n");
+                const auto reg_name = decode_reg16_name((this->opcode>>4)&0x3);
+                fmt::print("LD {}, d16\n", reg_name);
                 this->cycle++;
             } else if (this->cycle == 1) {
-                this->l = bus.read(this->pc + 1);
+                this->tmp1 = bus.read(this->pc + 1);
                 this->cycle++;
             } else if (this->cycle == 2) {
-                this->h = bus.read(this->pc + 2);
-                fmt::print("\t\t\t\t\t\t\t\t\t hl set to ${:02X}{:02X}\n", this->h, this->l);
+                const auto reg_name = decode_reg16_name((this->opcode>>4)&0x3);
+                auto &reg           = decode_reg16((this->opcode>>4)&0x3);
+
+                reg = static_cast<uint16_t>(bus.read(this->pc + 2))<<8 | this->tmp1;
+
+                fmt::print("\t\t\t\t\t\t\t\t\t {} set to ${:04X}\n", reg_name, reg);
                 this->pc += 3;
                 this->cycle = 0;
             }
@@ -209,8 +236,8 @@ void Cpu::do_tick(Bus &bus) {
         case 0xAD: // XOR L  1010 1101
         case 0xAF: // XOR A  1010 1111
         {
-            const auto reg_name = decode_reg_name(this->opcode & 0x7);
-            auto &reg           = decode_reg(this->opcode & 0x7);
+            const auto reg_name = decode_reg8_name(this->opcode & 0x7);
+            auto &reg           = decode_reg8(this->opcode & 0x7);
 
             fmt::print("XOR {}\n", reg_name);
             this->a     = this->a ^ reg;
@@ -228,8 +255,8 @@ void Cpu::do_tick(Bus &bus) {
         case 0x2D:
         case 0x3D: {
             // single cycle
-            const auto reg_name = decode_reg_name((this->opcode>>3)&0x7);
-            auto &reg = decode_reg((this->opcode>>3)&0x7);
+            const auto reg_name = decode_reg8_name((this->opcode>>3)&0x7);
+            auto &reg = decode_reg8((this->opcode>>3)&0x7);
 
             fmt::print("DEC {}\n", reg_name);
 
@@ -252,8 +279,8 @@ void Cpu::do_tick(Bus &bus) {
         case 0x2C:
         case 0x3C: {
             // single cycle
-            const auto reg_name = decode_reg_name((this->opcode>>3)&0x7);
-            auto &reg = decode_reg((this->opcode>>3)&0x7);
+            const auto reg_name = decode_reg8_name((this->opcode>>3)&0x7);
+            auto &reg = decode_reg8((this->opcode>>3)&0x7);
 
             fmt::print("INC {}\n", reg_name);
 
