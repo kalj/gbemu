@@ -91,20 +91,25 @@ void Cpu::do_tick(Bus &bus) {
                 this->cycle = 0;
             }
         } break;
-        case 0x21:
+        case 0x36: // LD (HL), d8
+        {
             if (this->cycle == 0) {
-                fmt::print("LD HL, d16\n");
+                fmt::print("LD (HL), d8\n");
                 this->cycle++;
             } else if (this->cycle == 1) {
-                this->l = bus.read(this->pc + 1);
+                this->tmp1 = bus.read(this->pc + 1);
                 this->cycle++;
-            } else if (this->cycle == 2) {
-                this->h = bus.read(this->pc + 2);
-                fmt::print("\t\t\t\t\t\t\t\t\t hl set to ${:02X}{:02X}\n", this->h, this->l);
-                this->pc += 3;
+            } else {
+                uint16_t hl = this->l | (static_cast<uint16_t>(this->h) << 8);
+                bus.write(hl, this->tmp1);
+                fmt::print("\t\t\t\t\t\t\t\t\t ${:02X} stored to (hl) (${:04X})\n",
+                           this->tmp1,
+                           hl);
+
+                this->pc += 2;
                 this->cycle = 0;
             }
-            break;
+        } break;
         case 0x32:
             if (this->cycle == 0) {
                 fmt::print("LD (HL-), A\n");
@@ -122,6 +127,46 @@ void Cpu::do_tick(Bus &bus) {
                 this->cycle = 0;
             }
             break;
+
+        // 16-bit register load
+        case 0x21:
+            if (this->cycle == 0) {
+                fmt::print("LD HL, d16\n");
+                this->cycle++;
+            } else if (this->cycle == 1) {
+                this->l = bus.read(this->pc + 1);
+                this->cycle++;
+            } else if (this->cycle == 2) {
+                this->h = bus.read(this->pc + 2);
+                fmt::print("\t\t\t\t\t\t\t\t\t hl set to ${:02X}{:02X}\n", this->h, this->l);
+                this->pc += 3;
+                this->cycle = 0;
+            }
+            break;
+
+        // store A to immediate address
+        case 0xEA:
+            if (this->cycle == 0) {
+                fmt::print("LD (a16), A\n");
+                this->cycle++;
+            } else if (this->cycle == 1) {
+                this->tmp1 = bus.read(this->pc + 1);
+                this->cycle++;
+            } else if (this->cycle == 2) {
+                this->tmp2 = bus.read(this->pc + 2);
+                this->cycle++;
+            } else if (this->cycle == 3) {
+                const uint16_t addr = (static_cast<uint16_t>(this->tmp2) << 8) | static_cast<uint16_t>(this->tmp1);
+                bus.write(addr, this->a);
+                fmt::print("\t\t\t\t\t\t\t\t\t a (${:02X}) stored to ${:04X}\n",
+                           this->a,
+                           addr);
+                this->pc += 3;
+                this->cycle = 0;
+            }
+            break;
+
+        // IO/HRAM PAGE LD instructions
         case 0xE0:
             if (this->cycle == 0) {
                 fmt::print("LD (a8), A\n");
