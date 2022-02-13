@@ -114,12 +114,15 @@ uint8_t Bus::read(uint16_t addr) const {
 void Bus::write(uint16_t addr, uint8_t data) {
     std::string desc = "";
     if(addr < 0x8000) {
-        throw std::runtime_error(fmt::format("INVALID BUS WRITE AT ${:04X} (ROM)", addr));
+        fmt::print("=========================================================\n");
+        fmt::print("   WARNING: INVALID BUS WRITE AT ${:04X} (ROM), data=${:02X}\n", addr, data);
+        fmt::print("=========================================================\n");
+        return;
     } else if(addr < 0xa000) {
         desc = "VRAM";
         this->vram[addr-0x8000] = data;
     } else if(addr < 0xc000) {
-        throw std::runtime_error(fmt::format("INVALID BUS WRITE AT ${:04X} (external RAM)", addr));
+        throw std::runtime_error(fmt::format("INVALID BUS WRITE AT ${:04X} (external RAM), data=${:02X}", addr, data));
     } else if(addr < 0xe000) {
         desc = "WRAM";
         this->wram[addr-0xc000] = data;
@@ -130,7 +133,10 @@ void Bus::write(uint16_t addr, uint8_t data) {
         desc = "OAM";
         this->oam[addr-0xfe00] = data;
     } else if(addr < 0xff00) {
-        throw std::runtime_error(fmt::format("INVALID BUS WRITE AT ${:04X} (prohibited area)", addr));
+        fmt::print("=====================================================================\n");
+        fmt::print("   WARNING: INVALID BUS WRITE AT ${:04X} (prohibited area), data=${:02X}\n", addr, data);
+        fmt::print("=====================================================================\n");
+        return;
     } else if(addr < 0xff80) {
         desc = "IO";
         this->ioreg[addr-0xff00] = data;
