@@ -1,5 +1,6 @@
 #include "cpu.h"
 #include "bus.h"
+#include "ppu.h"
 
 #include <fmt/core.h>
 #include <cstdint>
@@ -7,6 +8,7 @@
 #include <fstream>
 #include <iterator>
 #include <vector>
+// #include <SDL2/SDL.h>
 
 
 uint32_t rom_size_from_code(uint8_t code) {
@@ -162,16 +164,57 @@ int main(int argc, char **argv) {
     Cpu cpu;
     cpu.reset();
 
-    // let rom_dev = bus_devices::Rom::new(0, &rom);
-    // let mut bus = bus_devices::Bus::new(rom_dev);
+    // SDL_Init(SDL_INIT_VIDEO);
+
+    // SDL_Window * window = SDL_CreateWindow("",
+    //                                        SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
+    //                                        640, 480,
+    //                                        SDL_WINDOW_RESIZABLE);
+
+    // SDL_Renderer * renderer = SDL_CreateRenderer(window,
+    //                                              -1, SDL_RENDERER_PRESENTVSYNC);
+
+    const int width = 320;
+    const int height = 240;
+
+    // // Since we are going to display a low resolution buffer,
+    // // it is best to limit the window size so that it cannot
+    // // be smaller than our internal buffer size.
+    // SDL_SetWindowMinimumSize(window, width, height);
+
+    // SDL_RenderSetLogicalSize(renderer, width, height);
+    // SDL_RenderSetIntegerScale(renderer, 1);
+
+    // SDL_Texture * screen_texture = SDL_CreateTexture(renderer,
+    //                                                  SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STREAMING,
+    //                                                  width, height);
+
+    std::vector<uint32_t> pixel_buffer(width * height);
+
+    Ppu ppu;
 
     fmt::print("------------------------------------------------------\n");
     fmt::print("Starting execution\n\n");
 
     for(int i=0;;i++) {
 
-        fmt::print(" === [cycle = {}]\n", i);
+        fmt::print(" === [CPU cycle = {}]\n", i);
         cpu.do_tick(bus);
+
+        for(int j=0; j<4; j++) {
+            // fmt::print(" === [PPU cycle = {}]\n", 4*i+j);
+            ppu.do_tick(pixel_buffer, bus);
+        }
+
+        // if(i%(70224/4) == 0) {
+        //     // It's a good idea to clear the screen every frame,
+        //     // as artifacts may occur if the window overlaps with
+        //     // other windows or transparent overlays.
+        //     SDL_RenderClear(renderer);
+        //     SDL_UpdateTexture(screen_texture, NULL, pixel_buffer.data(), width * sizeof(uint32_t));
+        //     SDL_RenderCopy(renderer, screen_texture, NULL, NULL);
+        //     SDL_RenderPresent(renderer);
+        // }
     }
 
     return 0;

@@ -18,6 +18,7 @@ set(SOURCES
   src/gbemu.cpp
   src/cpu.cpp
   src/bus.cpp
+  src/ppu.cpp
   )
 
 add_executable(gbemu

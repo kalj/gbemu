@@ -75,82 +75,72 @@ Bus::Bus(CartridgeType type, const std::vector<uint8_t> &cartridge_rom, uint32_t
     {}
 
 uint8_t Bus::read(uint16_t addr) const {
+    uint8_t data = 0xff;
+    std::string desc = "";
     if(addr < 0x8000) {
-        fmt::print("        BUS read @ ${:04X} (ROM): ${:02X}\n", addr, this->rom[addr]);
-        return this->rom[addr];
+        desc = "ROM";
+        data = this->rom[addr];
     } else if(addr < 0xa000) {
-        const auto a = addr-0x8000;
-        fmt::print("        BUS read @ ${:04X} (VRAM): ${:02X}\n", addr, this->vram[a]);
-        return this->vram[a];
+        desc = "VRAM";
+        data = this->vram[addr-0x8000];
     } else if(addr < 0xc000) {
-        fmt::print("INVALID BUS READ AT ${:04X} (external RAM)\n", addr);
-        throw std::runtime_error("XRAM READ");
+        throw std::runtime_error(fmt::format("INVALID BUS READ AT ${:04X} (external RAM)", addr));
     } else if(addr < 0xe000) {
-        const auto a = addr-0xc000;
-        fmt::print("        BUS read @ ${:04X} (WRAM): ${:02X}\n", addr, this->wram[a]);
-        return this->wram[a];
+        desc = "WRAM";
+        data = this->wram[addr-0xc000];
     } else if(addr < 0xfe00) {
-        const auto a = addr-0xe000;
-        fmt::print("        BUS read @ ${:04X} (ECHO RAM): ${:02X}\n", addr, this->wram[a]);
-        return this->wram[a];
+        desc = "ECHO RAM";
+        data = this->wram[addr-0xe000];
     } else if(addr < 0xfea0) {
-        const auto a = addr-0xfe00;
-        fmt::print("        BUS read @ ${:04X} (OAM): ${:02X}\n", addr, this->oam[a]);
-        return this->oam[a];
+        desc = "OAM";
+        data = this->oam[addr-0xfe00];
     } else if(addr < 0xff00) {
-        fmt::print("INVALID BUS READ AT ${:04X} (prohibited area)\n", addr);
-        throw std::runtime_error("BUS PROHIB");
+        throw std::runtime_error(fmt::format("INVALID BUS READ AT ${:04X} (prohibited area)", addr));
     } else if(addr < 0xff80) {
-        const auto a = addr-0xff00;
-        fmt::print("        BUS read @ ${:04X} (IO): ${:02X}\n", addr, this->ioreg[a]);
-        return this->ioreg[a];
+        desc = "IO";
+        data = this->ioreg[addr-0xff00];
+        return data;
     } else if(addr == 0xffff) {
-        fmt::print("        BUS read @ ${:04X} (IE reg): ${:02X}\n", addr, this->iereg);
-        return this->iereg;
+        desc = "IE reg";
+        data = this->iereg;
     } else { // 0xff80 - 0xfffe
-        const auto a = addr-0xff80;
-        fmt::print("        BUS read @ ${:04X} (HRAM): ${:02X}\n", addr, this->hram[a]);
-        return this->hram[a];
+        desc = "HRAM";
+        data = this->hram[addr-0xff80];
     }
+    fmt::print("        BUS [${:04X}] -> ${:02X} ({})\n", addr, data, desc);
+    return data;
 }
 
 void Bus::write(uint16_t addr, uint8_t data) {
-    fmt::print("        BUS write of ${:02X} @ ${:04X} ", data, addr);
+    std::string desc = "";
     if(addr < 0x8000) {
-        fmt::print("\n");
         throw std::runtime_error(fmt::format("INVALID BUS WRITE AT ${:04X} (ROM)", addr));
     } else if(addr < 0xa000) {
-        const auto a = addr-0x8000;
-        fmt::print("(VRAM)\n");
-        this->vram[a] = data;
+        desc = "VRAM";
+        this->vram[addr-0x8000] = data;
     } else if(addr < 0xc000) {
-        fmt::print("\n");
         throw std::runtime_error(fmt::format("INVALID BUS WRITE AT ${:04X} (external RAM)", addr));
     } else if(addr < 0xe000) {
-        const auto a = addr-0xc000;
-        fmt::print("(WRAM)\n");
-        this->wram[a] = data;
+        desc = "WRAM";
+        this->wram[addr-0xc000] = data;
     } else if(addr < 0xfe00) {
-        const auto a = addr-0xe000;
-        fmt::print("(ECHO RAM)\n");
-        this->wram[a] = data;
+        desc = "ECHO RAM";
+        this->wram[addr-0xe000] = data;
     } else if(addr < 0xfea0) {
-        const auto a = addr-0xfe00;
-        fmt::print("(OAM)\n");
-        this->oam[a] = data;
+        desc = "OAM";
+        this->oam[addr-0xfe00] = data;
     } else if(addr < 0xff00) {
-        fmt::print("\n");
         throw std::runtime_error(fmt::format("INVALID BUS WRITE AT ${:04X} (prohibited area)", addr));
     } else if(addr < 0xff80) {
-        const auto a = addr-0xff00;
-        fmt::print("(IO)\n");
-        this->ioreg[a] = data;
+        desc = "IO";
+        this->ioreg[addr-0xff00] = data;
+        return;
     } else if(addr == 0xffff) {
-        fmt::print("(IE reg)\n");
+        desc = "IE reg";
         this->iereg = data;
     } else { // 0xff80 - 0xfffe
-        const auto a = addr-0xff80;
-        fmt::print("(HRAM)\n");
-        this->hram[a] = data;
+        desc = "HRAM";
+        this->hram[addr-0xff80] = data;
     }
+    fmt::print("        BUS [${:04X}] <- ${:02X}  ({})\n", addr, data, desc);
 }
