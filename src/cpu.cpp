@@ -307,20 +307,57 @@ void Cpu::do_tick(Bus &bus) {
         case 0x2C:
         case 0x3C: {
             // single cycle
-            const auto reg_name = decode_reg8_name((this->opcode>>3)&0x7);
-            auto &reg = decode_reg8((this->opcode>>3)&0x7);
+            const auto reg_name = decode_reg8_name((this->opcode >> 3) & 0x7);
+            auto &reg           = decode_reg8((this->opcode >> 3) & 0x7);
 
             fmt::print("INC {}\n", reg_name);
 
             reg += 1;
-            this->set_flag_z(reg==0);
+            this->set_flag_z(reg == 0);
             this->set_flag_n(false);
 
             fmt::print("\t\t\t\t\t\t\t\t\t {} incremented to ${:02X}\n", reg_name, reg);
 
             this->pc += 1;
+        } break;
+
+        // DEC {BC,DE,HL,SP}
+        case 0x0B:
+        case 0x1B:
+        case 0x2B:
+        case 0x3B:
+            if (this->cycle == 0) {
+                const auto reg_name = decode_reg16_name((this->opcode >> 4) & 0x3);
+                fmt::print("DEC {}\n", reg_name);
+                this->cycle++;
+            } else if (this->cycle == 1) {
+                const auto reg_name = decode_reg16_name((this->opcode >> 4) & 0x3);
+                auto &reg           = decode_reg16((this->opcode >> 4) & 0x3);
+                reg--;
+                fmt::print("\t\t\t\t\t\t\t\t\t {} decremented ${:04X}\n", reg_name, reg);
+                this->pc += 1;
+                this->cycle = 0;
+            }
             break;
-        }
+
+        // INC {BC,DE,HL,SP}
+        case 0x03:
+        case 0x13:
+        case 0x23:
+        case 0x33:
+            if (this->cycle == 0) {
+                const auto reg_name = decode_reg16_name((this->opcode >> 4) & 0x3);
+                fmt::print("INC {}\n", reg_name);
+                this->cycle++;
+            } else if (this->cycle == 1) {
+                const auto reg_name = decode_reg16_name((this->opcode >> 4) & 0x3);
+                auto &reg           = decode_reg16((this->opcode >> 4) & 0x3);
+                reg++;
+                fmt::print("\t\t\t\t\t\t\t\t\t {} incremented ${:04X}\n", reg_name, reg);
+                this->pc += 1;
+                this->cycle = 0;
+            }
+            break;
 
         // Comparison
         case 0xFE:
