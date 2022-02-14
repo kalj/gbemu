@@ -360,7 +360,18 @@ void Cpu::do_tick(Bus &bus) {
             break;
 
         default:
-            fmt::print("UNKOWN\n");
-            throw std::runtime_error("CPU INSTR");
+
+            fmt::print("???\n");
+            throw std::runtime_error(fmt::format("UNKNOWN OPCODE: ${:02X}", this->opcode));
     }
+}
+
+void Cpu::dump(std::ostream &os) const {
+
+    os << fmt::format("  a: {:02X} f: {:02X}\n", this->a, this->flags);
+    os << fmt::format("  bc: {:04X}\n", this->bc.r16);
+    os << fmt::format("  de: {:04X}\n", this->de.r16);
+    os << fmt::format("  hl: {:04X}\n", this->hl.r16);
+    os << fmt::format("  pc: {:04X}\n", this->pc);
+    os << fmt::format("  sp: {:04X}\n", this->sp);
 }

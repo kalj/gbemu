@@ -18,6 +18,9 @@ public:
     void reset();
     void do_tick(Bus &bus);
 
+    void dump(std::ostream &os) const;
+
+private:
     bool get_flag_z() const {
         return flags & 0x80;
     }
@@ -65,8 +68,6 @@ public:
 
     uint16_t &decode_reg16(uint8_t bits);
     std::string decode_reg16_name(uint8_t bits) const;
-
-private:
 
     // registers
     uint8_t a{0};

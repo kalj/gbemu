@@ -40,6 +40,7 @@ public:
     Bus(CartridgeType type, const std::vector<uint8_t> &cartridge_rom, uint32_t ram_size);
     uint8_t read(uint16_t addr) const;
     void write(uint16_t addr, uint8_t data);
+    void dump(std::ostream &os) const;
 
 private:
     CartridgeType cartridge_type;

@@ -150,3 +150,68 @@ void Bus::write(uint16_t addr, uint8_t data) {
     }
     fmt::print("        BUS [${:04X}] <- ${:02X}  ({})\n", addr, data, desc);
 }
+
+void Bus::dump(std::ostream &os) const {
+
+    os << "\nROM:";
+    for(uint16_t i=0; i<this->rom.size(); i++) {
+        const uint16_t a = i+0;
+        if(a%16 == 0) {
+            os << fmt::format("\n${:04X}:", a);
+        }
+
+        os << fmt::format(" {:02X}", this->rom[i]);
+    }
+
+    os << "\nVRAM:";
+    for(uint16_t i=0; i<this->vram.size(); i++) {
+        const uint16_t a = i+0x8000;
+        if(a%16 == 0) {
+            os << fmt::format("\n${:04X}:", a);
+        }
+
+        os << fmt::format(" {:02X}", this->vram[i]);
+    }
+
+    os << "\nWRAM:";
+    for(uint16_t i=0; i<this->wram.size(); i++) {
+        const uint16_t a = i+0xc000;
+        if(a%16 == 0) {
+            os << fmt::format("\n${:04X}:", a);
+        }
+
+        os << fmt::format(" {:02X}", this->wram[i]);
+    }
+
+    os << "\nOAM:";
+    for(uint16_t i=0; i<this->oam.size(); i++) {
+        const uint16_t a = i+0xfe00;
+        if(a%16 == 0) {
+            os << fmt::format("\n${:04X}:", a);
+        }
+
+        os << fmt::format(" {:02X}", this->oam[i]);
+    }
+
+    os << "\nIO:";
+    for(uint16_t i=0; i<this->ioreg.size(); i++) {
+        const uint16_t a = i+0xff00;
+        if(a%16 == 0) {
+            os << fmt::format("\n${:04X}:", a);
+        }
+
+        os << fmt::format(" {:02X}", this->ioreg[i]);
+    }
+
+    os << "\nHRAM:";
+    for(uint16_t i=0; i<this->hram.size(); i++) {
+        const uint16_t a = i+0xff80;
+        if(a%16 == 0) {
+            os << fmt::format("\n${:04X}:", a);
+        }
+
+        os << fmt::format(" {:02X}", this->hram[i]);
+    }
+
+    os << fmt::format("\nIE: {:02X}\n",this->iereg);
+}

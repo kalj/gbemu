@@ -196,25 +196,37 @@ int main(int argc, char **argv) {
     fmt::print("------------------------------------------------------\n");
     fmt::print("Starting execution\n\n");
 
-    for(int i=0;;i++) {
+    try {
+        for(int i=0;;i++) {
 
-        fmt::print(" === [CPU cycle = {}]\n", i);
-        cpu.do_tick(bus);
+            fmt::print(" === [CPU cycle = {}]\n", i);
+            cpu.do_tick(bus);
 
-        for(int j=0; j<4; j++) {
-            // fmt::print(" === [PPU cycle = {}]\n", 4*i+j);
-            ppu.do_tick(pixel_buffer, bus);
+            for(int j=0; j<4; j++) {
+                // fmt::print(" === [PPU cycle = {}]\n", 4*i+j);
+                ppu.do_tick(pixel_buffer, bus);
+            }
+
+            // if(i%(70224/4) == 0) {
+            //     // It's a good idea to clear the screen every frame,
+            //     // as artifacts may occur if the window overlaps with
+            //     // other windows or transparent overlays.
+            //     SDL_RenderClear(renderer);
+            //     SDL_UpdateTexture(screen_texture, NULL, pixel_buffer.data(), width * sizeof(uint32_t));
+            //     SDL_RenderCopy(renderer, screen_texture, NULL, NULL);
+            //     SDL_RenderPresent(renderer);
+            // }
         }
-
-        // if(i%(70224/4) == 0) {
-        //     // It's a good idea to clear the screen every frame,
-        //     // as artifacts may occur if the window overlaps with
-        //     // other windows or transparent overlays.
-        //     SDL_RenderClear(renderer);
-        //     SDL_UpdateTexture(screen_texture, NULL, pixel_buffer.data(), width * sizeof(uint32_t));
-        //     SDL_RenderCopy(renderer, screen_texture, NULL, NULL);
-        //     SDL_RenderPresent(renderer);
-        // }
+    } catch(std::exception &e) {
+        fmt::print("EXCEPTION CAUGHT: {}\n", e.what());
+        auto state_file = "state.txt";
+        fmt::print("Saving state to \"{}\"...\n", state_file);
+        std::ofstream fs(state_file);
+        fs << "Registers:\n";
+        cpu.dump(fs);
+        fs << "Memory dump:\n";
+        bus.dump(fs);
+        return 1;
     }
 
     return 0;
