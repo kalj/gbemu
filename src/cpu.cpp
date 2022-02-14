@@ -28,7 +28,7 @@ uint8_t &Cpu::decode_reg8(uint8_t bits) {
         return this->hl.r8.hi;
     case 5:
         return this->hl.r8.lo;
-    default: // 6
+    default: // 7
         return this->a;
     }
 }
@@ -47,7 +47,7 @@ std::string Cpu::decode_reg8_name(uint8_t bits) const {
         return "H";
     case 5:
         return "L";
-    default: // 6
+    default: // 7
         return "A";
     }
 }
@@ -95,6 +95,76 @@ void Cpu::do_tick(Bus &bus) {
         //-------------------------------------------------------
         // LD
         //-------------------------------------------------------
+
+        // LD r1, r2
+
+        case 0x40:
+        case 0x41:
+        case 0x42:
+        case 0x43:
+        case 0x44:
+        case 0x45:
+        case 0x47:
+
+        case 0x48:
+        case 0x49:
+        case 0x4a:
+        case 0x4b:
+        case 0x4c:
+        case 0x4d:
+        case 0x4f:
+
+        case 0x50:
+        case 0x51:
+        case 0x52:
+        case 0x53:
+        case 0x54:
+        case 0x55:
+        case 0x57:
+
+        case 0x58:
+        case 0x59:
+        case 0x5a:
+        case 0x5b:
+        case 0x5c:
+        case 0x5d:
+        case 0x5f:
+
+        case 0x60:
+        case 0x61:
+        case 0x62:
+        case 0x63:
+        case 0x64:
+        case 0x65:
+        case 0x67:
+
+        case 0x68:
+        case 0x69:
+        case 0x6a:
+        case 0x6b:
+        case 0x6c:
+        case 0x6d:
+        case 0x6f:
+
+        case 0x78:
+        case 0x79:
+        case 0x7a:
+        case 0x7b:
+        case 0x7c:
+        case 0x7d:
+        case 0x7f:
+            {
+                const auto src_name = decode_reg8_name(this->opcode & 0x7);
+                const auto dst_name = decode_reg8_name((this->opcode >> 3) & 0x7);
+                const auto &src           = decode_reg8(this->opcode & 0x7);
+                auto &dst           = decode_reg8((this->opcode >> 3) & 0x7);
+                fmt::print("LD {}, {}\n", dst_name, src_name);
+                dst = src;
+                fmt::print("\t\t\t\t\t\t\t\t\t {} loaded from {} (${:02X})\n", dst_name, src_name, dst);
+                this->pc += 1;
+            }
+            break;
+
         case 0x06: // LD B, d8    0000 0110
         case 0x0E: // LD C, d8    0000 1110
         case 0x16: // LD D, d8    0001 0110
@@ -102,20 +172,19 @@ void Cpu::do_tick(Bus &bus) {
         case 0x26: // LD H, d8    0010 0110
         case 0x2E: // LD L, d8    0010 1110
         case 0x3E: // LD A, d8    0011 1110
-        {
             if (this->cycle == 0) {
-                const auto reg_name = decode_reg8_name((this->opcode>>3)&0x7);
+                const auto reg_name = decode_reg8_name((this->opcode >> 3) & 0x7);
                 fmt::print("LD {}, d8\n", reg_name);
                 this->cycle++;
             } else {
-                const auto reg_name = decode_reg8_name((this->opcode>>3)&0x7);
-                auto &reg       = decode_reg8((this->opcode>>3)&0x7);
-                reg             = bus.read(this->pc + 1);
+                const auto reg_name = decode_reg8_name((this->opcode >> 3) & 0x7);
+                auto &reg           = decode_reg8((this->opcode >> 3) & 0x7);
+                reg                 = bus.read(this->pc + 1);
                 fmt::print("\t\t\t\t\t\t\t\t\t {} set to ${:02X}\n", reg_name, reg);
                 this->pc += 2;
                 this->cycle = 0;
             }
-        } break;
+            break;
         case 0x36: // LD (HL), d8
         {
             if (this->cycle == 0) {
@@ -256,6 +325,25 @@ void Cpu::do_tick(Bus &bus) {
         //-------------------------------------------------------
         // ALU
         //-------------------------------------------------------
+        case 0xA0: // AND B
+        case 0xA1: // AND C
+        case 0xA2: // AND D
+        case 0xA3: // AND E
+        case 0xA4: // AND H
+        case 0xA5: // AND L
+        case 0xA7: // AND A
+        {
+            const auto reg_name = decode_reg8_name(this->opcode & 0x7);
+            auto &reg           = decode_reg8(this->opcode & 0x7);
+
+            fmt::print("AND {}\n", reg_name);
+            this->a     = this->a & reg;
+            this->flags = (this->a == 0) ? 0x80 : 0x00;
+            fmt::print("\t\t\t\t\t\t\t\t\t A = A AND {} = ${:02X}\n", reg_name, this->a);
+            this->pc += 1;
+        } break;
+
+
         case 0xA8: // XOR B  1010 1000
         case 0xA9: // XOR C  1010 1001
         case 0xAA: // XOR D  1010 1010
@@ -271,6 +359,24 @@ void Cpu::do_tick(Bus &bus) {
             this->a     = this->a ^ reg;
             this->flags = (this->a == 0) ? 0x80 : 0x00;
             fmt::print("\t\t\t\t\t\t\t\t\t A = A XOR {} = ${:02X}\n", reg_name, this->a);
+            this->pc += 1;
+        } break;
+
+        case 0xB0: // OR B
+        case 0xB1: // OR C
+        case 0xB2: // OR D
+        case 0xB3: // OR E
+        case 0xB4: // OR H
+        case 0xB5: // OR L
+        case 0xB7: // OR A
+        {
+            const auto reg_name = decode_reg8_name(this->opcode & 0x7);
+            auto &reg           = decode_reg8(this->opcode & 0x7);
+
+            fmt::print("OR {}\n", reg_name);
+            this->a     = this->a | reg;
+            this->flags = (this->a == 0) ? 0x80 : 0x00;
+            fmt::print("\t\t\t\t\t\t\t\t\t A = A OR {} = ${:02X}\n", reg_name, this->a);
             this->pc += 1;
         } break;
 
