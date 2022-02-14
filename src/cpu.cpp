@@ -92,7 +92,9 @@ void Cpu::do_tick(Bus &bus) {
             this->cycle = 0; // start over
             break;
 
+        //-------------------------------------------------------
         // LD
+        //-------------------------------------------------------
         case 0x06: // LD B, d8    0000 0110
         case 0x0E: // LD C, d8    0000 1110
         case 0x16: // LD D, d8    0001 0110
@@ -142,6 +144,20 @@ void Cpu::do_tick(Bus &bus) {
                            this->a,
                            this->hl.r16);
                 this->hl.r16--;
+                this->pc += 1;
+                this->cycle = 0;
+            }
+            break;
+        case 0x2A: // LD A, (HL+)
+            if (this->cycle == 0) {
+                fmt::print("LD A, (HL+)\n");
+                this->cycle++;
+            } else if (this->cycle == 1) {
+                this->a = bus.read(this->hl.r16);
+                fmt::print("\t\t\t\t\t\t\t\t\t a (${:02X}) read from (hl) (${:04X}), and hl incremented\n",
+                           this->a,
+                           this->hl.r16);
+                this->hl.r16++;
                 this->pc += 1;
                 this->cycle = 0;
             }
@@ -221,6 +237,18 @@ void Cpu::do_tick(Bus &bus) {
                 this->a = bus.read(addr);
                 fmt::print("\t\t\t\t\t\t\t\t\t a (${:02X}) read from (${:04X})\n", this->a, addr);
                 this->pc += 2;
+                this->cycle = 0;
+            }
+            break;
+        case 0xE2:
+            if (this->cycle == 0) {
+                fmt::print("LD (C), A\n");
+                this->cycle++;
+            } else if (this->cycle == 1) {
+                const uint16_t addr = 0xff00 | this->bc.r8.lo; // (0xff00|c)
+                fmt::print("\t\t\t\t\t\t\t\t\t a (${:02X}) stored to (${:04X})\n", this->a, addr);
+                bus.write(addr, this->a);
+                this->pc += 1;
                 this->cycle = 0;
             }
             break;
@@ -346,6 +374,31 @@ void Cpu::do_tick(Bus &bus) {
                 const uint16_t new_pc = (static_cast<uint16_t>(this->tmp2) << 8) | static_cast<uint16_t>(this->tmp1);
                 fmt::print("\t\t\t\t\t\t\t\t\t Jumping to: ${:04X}\n", new_pc);
                 this->pc = new_pc;
+                this->cycle = 0;
+            }
+            break;
+        case 0xCD:
+            if(this->cycle == 0) {
+                fmt::print("CALL a16\n");
+                this->cycle++;
+            } else if (this->cycle == 1) {
+                this->tmp1 = bus.read(this->pc + 1); // addr_l
+                this->cycle++;
+            } else if (this->cycle == 2) {
+                this->tmp2 = bus.read(this->pc + 2); // addr_h
+                this->cycle++;
+            } else if (this->cycle == 3) {
+                this->pc += 2;
+                this->sp--;
+                bus.write(this->sp, (this->pc >> 8)&0xff);
+                this->cycle++;
+            } else if (this->cycle == 4) {
+                this->sp--;
+                bus.write(this->sp, this->pc&0xff);
+                this->cycle++;
+            } else if (this->cycle == 5) {
+                this->pc = (static_cast<uint16_t>(this->tmp2) << 8) | static_cast<uint16_t>(this->tmp1);
+                fmt::print("\t\t\t\t\t\t\t\t\t Calling subroutine at: ${:04X}\n", this->pc);
                 this->cycle = 0;
             }
             break;
