@@ -78,6 +78,33 @@ std::string Cpu::decode_reg16_name(uint8_t bits) const {
     }
 }
 
+uint16_t &Cpu::decode_stack_reg16(uint8_t bits) {
+    switch(bits) {
+    case 0:
+        return this->bc.r16;
+    case 1:
+        return this->de.r16;
+    case 2:
+        return this->hl.r16;
+    default: // 3
+        return this->af.r16;
+    }
+}
+
+std::string Cpu::decode_stack_reg16_name(uint8_t bits) const {
+    switch(bits) {
+    case 0:
+        return "BC";
+    case 1:
+        return "DE";
+    case 2:
+        return "HL";
+    default: // 3
+        return "AF";
+    }
+}
+
+
 void Cpu::do_tick(Bus &bus) {
 
     if(this->cycle == 0) {
@@ -324,8 +351,60 @@ void Cpu::do_tick(Bus &bus) {
             break;
 
         //-------------------------------------------------------
-        // ALU
+        // stack operations
         //-------------------------------------------------------
+
+        case 0xC1: // POP
+        case 0xD1:
+        case 0xE1:
+        case 0xF1: {
+            const auto reg_name = decode_stack_reg16_name((this->opcode >> 4) & 0x3);
+            auto &reg           = decode_stack_reg16((this->opcode >> 4) & 0x3);
+            if (this->cycle == 0) {
+                fmt::print("POP {}\n", reg_name);
+                this->cycle++;
+            } else if (this->cycle == 1) {
+                this->tmp1 = bus.read(this->sp);
+                this->sp++;
+                this->cycle++;
+            } else {
+                this->tmp2 = bus.read(this->sp);
+                this->sp++;
+                reg = static_cast<uint16_t>(this->tmp1) << 8 | this->tmp2;
+                fmt::print("\t\t\t\t\t\t\t\t\t POP {} from stack: ${:04X}\n", reg_name, reg);
+                this->pc += 1;
+                this->cycle = 0;
+            }
+        } break;
+
+        case 0xC5: // PUSH
+        case 0xD5:
+        case 0xE5:
+        case 0xF5: {
+            const auto reg_name = decode_stack_reg16_name((this->opcode >> 4) & 0x3);
+            auto &reg           = decode_stack_reg16((this->opcode >> 4) & 0x3);
+            if (this->cycle == 0) {
+                fmt::print("PUSH {}\n", reg_name);
+                this->cycle++;
+            } else if (this->cycle == 1) {
+                this->sp--;
+                bus.write(this->sp, 0xff & (reg >> 8));
+                this->cycle++;
+            } else if (this->cycle == 2) {
+                this->sp--;
+                bus.write(this->sp, reg & 0xff);
+                this->cycle++;
+            } else {
+                fmt::print("\t\t\t\t\t\t\t\t\t pushed {} from to stack: ${:04X}\n", reg_name, reg);
+                this->pc += 1;
+                this->cycle = 0;
+            }
+        } break;
+
+            //-------------------------------------------------------
+            // ALU
+            //-------------------------------------------------------
+
         case 0xA0: // AND B
         case 0xA1: // AND C
         case 0xA2: // AND D
