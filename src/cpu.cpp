@@ -191,6 +191,27 @@ void Cpu::do_tick(Bus &bus) {
                 this->pc += 1;
             }
             break;
+        case 0x46:
+        case 0x4E:
+        case 0x56:
+        case 0x5E:
+        case 0x66:
+        case 0x6E:
+        case 0x7E:
+            if (this->cycle == 0) {
+                const auto reg_name = decode_reg8_name((this->opcode >> 3) & 0x7);
+                fmt::print("LD {}, (HL)\n", reg_name);
+                this->cycle++;
+            } else {
+                const auto reg_name = decode_reg8_name((this->opcode >> 3) & 0x7);
+                auto &reg           = decode_reg8((this->opcode >> 3) & 0x7);
+
+                reg                 = bus.read(this->hl.r16);
+                fmt::print("\t\t\t\t\t\t\t\t\t {} loaded from (HL) (${:04X}) = ${:02X}\n", reg_name, this->hl.r16, reg);
+                this->pc += 1;
+                this->cycle = 0;
+            }
+        break;
 
         case 0x06: // LD B, d8    0000 0110
         case 0x0E: // LD C, d8    0000 1110
@@ -650,6 +671,21 @@ void Cpu::do_tick(Bus &bus) {
         //-------------------------------------------------------
         // Jumps
         //-------------------------------------------------------
+        case 0x18:
+            if(this->cycle == 0) {
+                fmt::print("JR s8\n");
+                this->cycle++;
+            } else if (this->cycle == 1) {
+                this->tmp1 = bus.read(this->pc+1);
+                this->cycle++;
+            } else if (this->cycle == 2) {
+                const int16_t offset = static_cast<int8_t>(this->tmp1);
+                this->pc += offset+2;
+                fmt::print("\t\t\t\t\t\t\t\t\t doing relative jump with offset {} to ${:04X}\n", offset, this->pc);
+                this->cycle=0;
+            }
+            break;
+
         case 0x20:
             if(this->cycle == 0) {
                 fmt::print("JR NZ, s8\n");
@@ -670,6 +706,14 @@ void Cpu::do_tick(Bus &bus) {
                 this->cycle=0;
             }
             break;
+
+        case 0xE9: {
+                fmt::print("JP HL\n");
+                this->pc = this->hl.r16;
+                fmt::print("\t\t\t\t\t\t\t\t\t jumping to address in HL (${:04X})\n", this->pc);
+            }
+            break;
+
         case 0xC3:
             if(this->cycle == 0) {
                 fmt::print("JP nn nn\n");
