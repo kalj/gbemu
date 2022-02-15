@@ -343,6 +343,19 @@ void Cpu::do_tick(Bus &bus) {
             this->pc += 1;
         } break;
 
+        case 0xE6: // AND A, d8
+            if (this->cycle == 0) {
+                fmt::print("LD A, d8\n");
+                this->cycle++;
+            } else if (this->cycle == 1) {
+                const auto v = bus.read(this->pc + 1);
+                this->a &= v;
+                this->flags = (this->a == 0) ? 0b10100000 : 0b00100000;
+                fmt::print("\t\t\t\t\t\t\t\t\t A = A AND ${:02X} = ${:02X}\n", v, this->a);
+                this->pc += 2;
+                this->cycle = 0;
+            }
+            break;
 
         case 0xA8: // XOR B  1010 1000
         case 0xA9: // XOR C  1010 1001
@@ -482,7 +495,19 @@ void Cpu::do_tick(Bus &bus) {
             }
             break;
 
-        // jumps
+        // Complement
+        case 0x2F: // CPL
+        {
+            fmt::print("CPL\n");
+            this->a     = ~(this->a);
+            this->flags = (this->a & 0b10010000) | 0b01100000;
+            fmt::print("\t\t\t\t\t\t\t\t\t A = ~A = ${:02X}\n", this->a);
+            this->pc += 1;
+        } break;
+
+        //-------------------------------------------------------
+        // Jumps
+        //-------------------------------------------------------
         case 0x20:
             if(this->cycle == 0) {
                 fmt::print("JR NZ, s8\n");
@@ -566,7 +591,9 @@ void Cpu::do_tick(Bus &bus) {
             }
             break;
 
-        // interrupt stuff
+        //-------------------------------------------------------
+        // Interrupt stuff
+        //-------------------------------------------------------
         case 0xF3:
             // single cycle
             fmt::print("DI\n");
