@@ -520,6 +520,7 @@ void Cpu::do_tick(Bus &bus) {
                 this->cycle = 0;
             }
             break;
+        // Call
         case 0xCD:
             if(this->cycle == 0) {
                 fmt::print("CALL a16\n");
@@ -531,7 +532,7 @@ void Cpu::do_tick(Bus &bus) {
                 this->tmp2 = bus.read(this->pc + 2); // addr_h
                 this->cycle++;
             } else if (this->cycle == 3) {
-                this->pc += 2;
+                this->pc += 3;
                 this->sp--;
                 bus.write(this->sp, (this->pc >> 8)&0xff);
                 this->cycle++;
@@ -545,13 +546,39 @@ void Cpu::do_tick(Bus &bus) {
                 this->cycle = 0;
             }
             break;
+        // Return
+        case 0xC9:
+            if(this->cycle == 0) {
+                fmt::print("RET\n");
+                this->cycle++;
+            } else if (this->cycle == 1) {
+                this->tmp1 = bus.read(this->sp);
+                this->sp++;
+                this->cycle++;
+            } else if (this->cycle == 2) {
+                this->tmp2 = bus.read(this->sp);
+                this->sp++;
+                this->cycle++;
+            } else if (this->cycle == 3) {
+                this->pc = (static_cast<uint16_t>(this->tmp2) << 8) | static_cast<uint16_t>(this->tmp1);
+                fmt::print("\t\t\t\t\t\t\t\t\t Returning from subroutine\n", this->pc);
+                this->cycle = 0;
+            }
+            break;
 
         // interrupt stuff
         case 0xF3:
             // single cycle
             fmt::print("DI\n");
             this->ime = false;
-            fmt::print("\t\t\t\t\t\t\t\t\t All interrupts disabled\n");
+            fmt::print("\t\t\t\t\t\t\t\t\t Maskable interrupts disabled\n");
+            this->pc++;
+            break;
+        case 0xFB:
+            // single cycle
+            fmt::print("EI\n");
+            this->ime = true;
+            fmt::print("\t\t\t\t\t\t\t\t\t Maskable interrupts enabled\n");
             this->pc++;
             break;
 
