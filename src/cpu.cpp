@@ -405,6 +405,68 @@ void Cpu::do_tick(Bus &bus) {
             // ALU
             //-------------------------------------------------------
 
+        case 0x80: // ADD
+        case 0x81:
+        case 0x82:
+        case 0x83:
+        case 0x84:
+        case 0x85:
+        case 0x87:
+
+        case 0x88: // ADC
+        case 0x89:
+        case 0x8a:
+        case 0x8b:
+        case 0x8c:
+        case 0x8d:
+        case 0x8f:
+        {
+            const bool with_carry = this->opcode & 0x08;
+
+            const auto instr_name = with_carry ? "ADC" : "ADD";
+
+            const auto reg_name = decode_reg8_name(this->opcode & 0x7);
+            auto &reg           = decode_reg8(this->opcode & 0x7);
+
+            fmt::print("{} A, {}\n", instr_name, reg_name);
+
+            const uint8_t res5  = (this->a() & 0xf) + (reg & 0xf) + (with_carry && this->get_flag_c() ? 1 : 0);
+            const uint16_t res9 = static_cast<uint16_t>(this->a()) + reg + (with_carry && this->get_flag_c() ? 1 : 0);
+            this->a() = res9 & 0xff;
+
+            this->set_flag_h(res5 & 0x10 != 0);
+            this->set_flag_c(res9&0x100 != 0);
+            this->set_flag_z(this->a() == 0);
+            this->set_flag_n(0);
+            fmt::print("\t\t\t\t\t\t\t\t\t A = A {} {} = ${:02X}\n", instr_name, reg_name, this->a());
+            this->pc += 1;
+        } break;
+
+        case 0x09: // ADD HL, r16
+        case 0x19:
+        case 0x29:
+        case 0x39:
+            if (this->cycle == 0) {
+                const auto reg_name = decode_reg16_name((this->opcode>>4) & 0x3);
+                fmt::print("ADD HL, {}\n", reg_name);
+                this->cycle++;
+            } else if (this->cycle == 1) {
+
+                auto &reg           = decode_reg16((this->opcode>>4) & 0x3);
+                const uint16_t res13  = (this->hl.r16&0x0fff) + (reg & 0x0fff);
+                const uint32_t res17 = static_cast<uint32_t>(this->hl.r16) + reg;
+                this->hl.r16 = res17 & 0xffff;
+
+                this->set_flag_h(res13 & 0x1000);
+                this->set_flag_c(res17 & 0x10000);
+                this->set_flag_n(0);
+                const auto reg_name = decode_reg16_name((this->opcode>>4) & 0x3);
+                fmt::print("\t\t\t\t\t\t\t\t\t HL = HL + {} = ${:04X}\n", reg_name, this->hl.r16);
+                this->pc += 1;
+                this->cycle = 0;
+            }
+        break;
+
         case 0xA0: // AND B
         case 0xA1: // AND C
         case 0xA2: // AND D
