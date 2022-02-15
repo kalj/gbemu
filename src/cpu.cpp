@@ -5,8 +5,8 @@
 #include <fmt/core.h>
 
 void Cpu::reset() {
-    this->a     = 0x01; // on GB/SGB. 0xff on GBP, 0x11 on GBC
-    this->flags = 0xb0;
+    this->af.r8.hi = 0x01; // on GB/SGB. 0xff on GBP, 0x11 on GBC
+    this->af.r8.lo = 0xb0;
     this->bc.r16 = 0x0013; // on GB/SGB/GBP/GBC
     this->de.r16 = 0x00d8;
     this->hl.r16 = 0x014d;
@@ -29,7 +29,7 @@ uint8_t &Cpu::decode_reg8(uint8_t bits) {
     case 5:
         return this->hl.r8.lo;
     default: // 7
-        return this->a;
+        return this->af.r8.hi;
     }
 }
 
@@ -185,6 +185,7 @@ void Cpu::do_tick(Bus &bus) {
                 this->cycle = 0;
             }
             break;
+
         case 0x36: // LD (HL), d8
         {
             if (this->cycle == 0) {
@@ -208,9 +209,9 @@ void Cpu::do_tick(Bus &bus) {
                 fmt::print("LD (HL-), A\n");
                 this->cycle++;
             } else if (this->cycle == 1) {
-                bus.write(this->hl.r16, this->a);
+                bus.write(this->hl.r16, this->a());
                 fmt::print("\t\t\t\t\t\t\t\t\t a (${:02X}) stored to (hl) (${:04X}), and hl decremented\n",
-                           this->a,
+                           this->a(),
                            this->hl.r16);
                 this->hl.r16--;
                 this->pc += 1;
@@ -222,9 +223,9 @@ void Cpu::do_tick(Bus &bus) {
                 fmt::print("LD A, (HL+)\n");
                 this->cycle++;
             } else if (this->cycle == 1) {
-                this->a = bus.read(this->hl.r16);
+                this->a() = bus.read(this->hl.r16);
                 fmt::print("\t\t\t\t\t\t\t\t\t a (${:02X}) read from (hl) (${:04X}), and hl incremented\n",
-                           this->a,
+                           this->a(),
                            this->hl.r16);
                 this->hl.r16++;
                 this->pc += 1;
@@ -269,9 +270,9 @@ void Cpu::do_tick(Bus &bus) {
                 this->cycle++;
             } else if (this->cycle == 3) {
                 const uint16_t addr = (static_cast<uint16_t>(this->tmp2) << 8) | static_cast<uint16_t>(this->tmp1);
-                bus.write(addr, this->a);
+                bus.write(addr, this->a());
                 fmt::print("\t\t\t\t\t\t\t\t\t a (${:02X}) stored to ${:04X}\n",
-                           this->a,
+                           this->a(),
                            addr);
                 this->pc += 3;
                 this->cycle = 0;
@@ -288,8 +289,8 @@ void Cpu::do_tick(Bus &bus) {
                 this->cycle++;
             } else {
                 const uint16_t addr = 0xff00 | this->tmp1;
-                fmt::print("\t\t\t\t\t\t\t\t\t a (${:02X}) stored to (${:04X})\n", this->a, addr);
-                bus.write(addr, this->a);
+                fmt::print("\t\t\t\t\t\t\t\t\t a (${:02X}) stored to (${:04X})\n", this->a(), addr);
+                bus.write(addr, this->a());
                 this->pc += 2;
                 this->cycle = 0;
             }
@@ -303,8 +304,8 @@ void Cpu::do_tick(Bus &bus) {
                 this->cycle++;
             } else {
                 const uint16_t addr = 0xff00 | this->tmp1;
-                this->a = bus.read(addr);
-                fmt::print("\t\t\t\t\t\t\t\t\t a (${:02X}) read from (${:04X})\n", this->a, addr);
+                this->a() = bus.read(addr);
+                fmt::print("\t\t\t\t\t\t\t\t\t a (${:02X}) read from (${:04X})\n", this->a(), addr);
                 this->pc += 2;
                 this->cycle = 0;
             }
@@ -315,8 +316,8 @@ void Cpu::do_tick(Bus &bus) {
                 this->cycle++;
             } else if (this->cycle == 1) {
                 const uint16_t addr = 0xff00 | this->bc.r8.lo; // (0xff00|c)
-                fmt::print("\t\t\t\t\t\t\t\t\t a (${:02X}) stored to (${:04X})\n", this->a, addr);
-                bus.write(addr, this->a);
+                fmt::print("\t\t\t\t\t\t\t\t\t a (${:02X}) stored to (${:04X})\n", this->a(), addr);
+                bus.write(addr, this->a());
                 this->pc += 1;
                 this->cycle = 0;
             }
@@ -337,9 +338,9 @@ void Cpu::do_tick(Bus &bus) {
             auto &reg           = decode_reg8(this->opcode & 0x7);
 
             fmt::print("AND {}\n", reg_name);
-            this->a     = this->a & reg;
-            this->flags = (this->a == 0) ? 0x80 : 0x00;
-            fmt::print("\t\t\t\t\t\t\t\t\t A = A AND {} = ${:02X}\n", reg_name, this->a);
+            this->a()     &= reg;
+            this->flags() = (this->a() == 0) ? 0x80 : 0x00;
+            fmt::print("\t\t\t\t\t\t\t\t\t A = A AND {} = ${:02X}\n", reg_name, this->a());
             this->pc += 1;
         } break;
 
@@ -349,9 +350,9 @@ void Cpu::do_tick(Bus &bus) {
                 this->cycle++;
             } else if (this->cycle == 1) {
                 const auto v = bus.read(this->pc + 1);
-                this->a &= v;
-                this->flags = (this->a == 0) ? 0b10100000 : 0b00100000;
-                fmt::print("\t\t\t\t\t\t\t\t\t A = A AND ${:02X} = ${:02X}\n", v, this->a);
+                this->a() &= v;
+                this->flags() = (this->a() == 0) ? 0b10100000 : 0b00100000;
+                fmt::print("\t\t\t\t\t\t\t\t\t A = A AND ${:02X} = ${:02X}\n", v, this->a());
                 this->pc += 2;
                 this->cycle = 0;
             }
@@ -369,9 +370,9 @@ void Cpu::do_tick(Bus &bus) {
             auto &reg           = decode_reg8(this->opcode & 0x7);
 
             fmt::print("XOR {}\n", reg_name);
-            this->a     = this->a ^ reg;
-            this->flags = (this->a == 0) ? 0x80 : 0x00;
-            fmt::print("\t\t\t\t\t\t\t\t\t A = A XOR {} = ${:02X}\n", reg_name, this->a);
+            this->a()     ^= reg;
+            this->flags() = (this->a() == 0) ? 0x80 : 0x00;
+            fmt::print("\t\t\t\t\t\t\t\t\t A = A XOR {} = ${:02X}\n", reg_name, this->a());
             this->pc += 1;
         } break;
 
@@ -387,9 +388,9 @@ void Cpu::do_tick(Bus &bus) {
             auto &reg           = decode_reg8(this->opcode & 0x7);
 
             fmt::print("OR {}\n", reg_name);
-            this->a     = this->a | reg;
-            this->flags = (this->a == 0) ? 0x80 : 0x00;
-            fmt::print("\t\t\t\t\t\t\t\t\t A = A OR {} = ${:02X}\n", reg_name, this->a);
+            this->a()     |= reg;
+            this->flags() = (this->a() == 0) ? 0x80 : 0x00;
+            fmt::print("\t\t\t\t\t\t\t\t\t A = A OR {} = ${:02X}\n", reg_name, this->a());
             this->pc += 1;
         } break;
 
@@ -485,10 +486,10 @@ void Cpu::do_tick(Bus &bus) {
                 this->cycle++;
             } else {
                 const auto val = bus.read(this->pc + 1);
-                this->set_flag_z(this->a == val);
+                this->set_flag_z(this->a() == val);
                 this->set_flag_n(true);
 
-                fmt::print("\t\t\t\t\t\t\t\t\t a (${:02X}) compared to ${:02X}\n", this->a, val);
+                fmt::print("\t\t\t\t\t\t\t\t\t a (${:02X}) compared to ${:02X}\n", this->a(), val);
 
                 this->pc += 2;
                 this->cycle=0;
@@ -499,9 +500,9 @@ void Cpu::do_tick(Bus &bus) {
         case 0x2F: // CPL
         {
             fmt::print("CPL\n");
-            this->a     = ~(this->a);
-            this->flags = (this->a & 0b10010000) | 0b01100000;
-            fmt::print("\t\t\t\t\t\t\t\t\t A = ~A = ${:02X}\n", this->a);
+            this->a()     = ~(this->a());
+            this->flags() = (this->a() & 0b10010000) | 0b01100000;
+            fmt::print("\t\t\t\t\t\t\t\t\t A = ~A = ${:02X}\n", this->a());
             this->pc += 1;
         } break;
 
@@ -587,12 +588,12 @@ void Cpu::do_tick(Bus &bus) {
                 this->cycle++;
             } else if (this->cycle == 1) {
                 this->pc += 1;
-                bus.write(this->sp, this->pc&0xff);
                 this->sp--;
+                bus.write(this->sp, this->pc&0xff);
                 this->cycle++;
             } else if (this->cycle == 2) {
-                bus.write(this->sp, (this->pc >> 8)&0xff);
                 this->sp--;
+                bus.write(this->sp, (this->pc >> 8)&0xff);
                 this->cycle++;
             } else if (this->cycle == 3) {
                 this->pc = 8*this->tmp1;
@@ -690,7 +691,7 @@ void Cpu::do_tick(Bus &bus) {
 
 void Cpu::dump(std::ostream &os) const {
 
-    os << fmt::format("  a: {:02X} f: {:02X}\n", this->a, this->flags);
+    os << fmt::format("  af: {:04X}\n", this->af.r16);
     os << fmt::format("  bc: {:04X}\n", this->bc.r16);
     os << fmt::format("  de: {:04X}\n", this->de.r16);
     os << fmt::format("  hl: {:04X}\n", this->hl.r16);

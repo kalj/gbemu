@@ -21,45 +21,57 @@ public:
     void dump(std::ostream &os) const;
 
 private:
+    uint8_t &a() {
+        return this->af.r8.hi;
+    }
+
+    uint8_t &flags() {
+        return this->af.r8.lo;
+    }
+
+    const uint8_t &flags() const {
+        return this->af.r8.lo;
+    }
+
     bool get_flag_z() const {
-        return flags & 0x80;
+        return this->flags() & 0x80;
     }
     bool get_flag_n() const {
-        return flags & 0x40;
+        return this->flags() & 0x40;
     }
     bool get_flag_h() const {
-        return flags & 0x20;
+        return this->flags() & 0x20;
     }
     bool get_flag_c() const {
-        return flags & 0x10;
+        return this->flags() & 0x10;
     }
 
     void set_flag_z(bool val) {
         if(val) {
-            flags |= 0x80;
+            this->flags() |= 0x80;
         } else {
-            flags &= ~0x80;
+            this->flags() &= ~0x80;
         }
     }
     void set_flag_n(bool val) {
         if(val) {
-            flags |= 0x40;
+            this->flags() |= 0x40;
         } else {
-            flags &= ~0x40;
+            this->flags() &= ~0x40;
         }
     }
     void set_flag_h(bool val) {
         if(val) {
-            flags |= 0x20;
+            this->flags() |= 0x20;
         } else {
-            flags &= ~0x20;
+            this->flags() &= ~0x20;
         }
     }
     void set_flag_c(bool val) {
         if(val) {
-            flags |= 0x10;
+            this->flags() |= 0x10;
         } else {
-            flags &= ~0x10;
+            this->flags() &= ~0x10;
         }
     }
 
@@ -70,8 +82,7 @@ private:
     std::string decode_reg16_name(uint8_t bits) const;
 
     // registers
-    uint8_t a{0};
-    uint8_t flags{0};
+    reg af{0};
     reg bc{0};
     reg de{0};
     reg hl{0};
