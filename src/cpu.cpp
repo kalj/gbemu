@@ -609,8 +609,48 @@ void Cpu::do_tick(Bus &bus) {
             this->pc++;
             break;
 
-        default:
+        //-------------------------------------------------------
+        // Extended instruction set
+        //-------------------------------------------------------
+        case 0xCB:
+            if (this->cycle == 0) {
+                fmt::print("16-bit instruction\n");
+                this->cycle++;
+                return;
+            }
 
+            if (this->cycle == 1) {
+                this->tmp1 = bus.read(this->pc + 1);
+                fmt::print("\t\t\t\t\t\t\t\t read extended opcode: ${:02X} -> ", this->tmp1);
+            }
+
+            switch (this->tmp1) {
+            case 0x30:
+            case 0x31:
+            case 0x32:
+            case 0x33:
+            case 0x34:
+            case 0x35:
+            case 0x37:
+                if (this->cycle == 1) {
+                    const auto reg_name = decode_reg8_name((this->opcode >> 3) & 0x7);
+                    fmt::print("SWAP {}\n", reg_name);
+                    auto &reg = decode_reg8((this->opcode >> 3) & 0x7);
+                    reg       = ((reg & 0xf) << 4) | ((reg >> 4) & 0xf);
+
+                    fmt::print("\t\t\t\t\t\t\t\t\t Swapping high and low nibbles of {} = ${:02X}\n", reg_name, reg);
+                    this->pc += 2;
+                    this->cycle = 0;
+                }
+                break;
+            default:
+                fmt::print("???\n");
+                throw std::runtime_error(fmt::format("UNKNOWN EXTENDED OPCODE: ${:02X}", this->tmp1));
+            }
+
+            break;
+
+        default:
             fmt::print("???\n");
             throw std::runtime_error(fmt::format("UNKNOWN OPCODE: ${:02X}", this->opcode));
     }
