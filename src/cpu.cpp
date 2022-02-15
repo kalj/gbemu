@@ -571,6 +571,38 @@ void Cpu::do_tick(Bus &bus) {
                 this->cycle = 0;
             }
             break;
+
+        // RST n
+        case 0xC7:
+        case 0xD7:
+        case 0xE7:
+        case 0xF7:
+        case 0xCF:
+        case 0xDF:
+        case 0xEF:
+        case 0xFF:
+            if(this->cycle == 0) {
+                this->tmp1 = (this->opcode>>3)&0x7;
+                fmt::print("RST {}\n",this->tmp1);
+                this->cycle++;
+            } else if (this->cycle == 1) {
+                this->pc += 1;
+                bus.write(this->sp, this->pc&0xff);
+                this->sp--;
+                this->cycle++;
+            } else if (this->cycle == 2) {
+                bus.write(this->sp, (this->pc >> 8)&0xff);
+                this->sp--;
+                this->cycle++;
+            } else if (this->cycle == 3) {
+                this->pc = 8*this->tmp1;
+                fmt::print("\t\t\t\t\t\t\t\t\t Calling subroutine at: ${:04X}\n", this->pc);
+                this->cycle = 0;
+            }
+            break;
+
+
+
         // Return
         case 0xC9:
             if(this->cycle == 0) {
