@@ -82,7 +82,7 @@ void Cpu::do_tick(Bus &bus) {
 
     if(this->cycle == 0) {
         this->opcode = bus.read(this->pc);
-        fmt::print("\t\t\t\t\t\t\t\t read opcode: ${:02X} -> ", opcode);
+        fmt::print("\t\t\t\t\t\t\t\t read opcode: ${:02X} -> ", this->opcode);
     }
 
     switch (this->opcode) {

@@ -154,7 +154,7 @@ void Bus::write(uint16_t addr, uint8_t data) {
 void Bus::dump(std::ostream &os) const {
 
     os << "\nROM:";
-    for(uint16_t i=0; i<this->rom.size(); i++) {
+    for(size_t i=0; i<this->rom.size(); i++) {
         const uint16_t a = i+0;
         if(a%16 == 0) {
             os << fmt::format("\n${:04X}:", a);
