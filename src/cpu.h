@@ -84,6 +84,9 @@ private:
     uint16_t &decode_stack_reg16(uint8_t bits);
     std::string decode_stack_reg16_name(uint8_t bits) const;
 
+    void add(uint8_t val, bool with_carry);
+    uint8_t get_sub(uint8_t val, bool with_carry);
+
     // registers
     reg af{0};
     reg bc{0};

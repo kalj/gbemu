@@ -104,6 +104,31 @@ std::string Cpu::decode_stack_reg16_name(uint8_t bits) const {
     }
 }
 
+void Cpu::add(uint8_t val, bool with_carry) {
+
+    const uint8_t res5  = (this->a() & 0xf) + (val & 0xf) + (with_carry && this->get_flag_c() ? 1 : 0);
+    const uint16_t res9 = static_cast<uint16_t>(this->a()) + val + (with_carry && this->get_flag_c() ? 1 : 0);
+    this->a() = res9 & 0xff;
+
+    this->set_flag_h(res5 & 0x10 != 0);
+    this->set_flag_c(res9&0x100 != 0);
+    this->set_flag_z(this->a() == 0);
+    this->set_flag_n(false);
+}
+
+uint8_t Cpu::get_sub(uint8_t val, bool with_carry) {
+    const uint8_t res5 = (this->a()&0xf) - (val&0xf) -(with_carry&&this->get_flag_c()?1:0);
+    const uint16_t res9 = static_cast<uint16_t>(this->a()) - val -(with_carry&&this->get_flag_c()?1:0);
+
+    const auto res = res9&0xff;
+    this->set_flag_h(res5&0x10);
+    this->set_flag_c(res9&0x100);
+    this->set_flag_n(true);
+    this->set_flag_z(res == 0);
+
+    return res;
+}
+
 
 void Cpu::do_tick(Bus &bus) {
 
@@ -445,20 +470,13 @@ void Cpu::do_tick(Bus &bus) {
             const bool with_carry = this->opcode & 0x08;
 
             const auto instr_name = with_carry ? "ADC" : "ADD";
-
             const auto reg_name = decode_reg8_name(this->opcode & 0x7);
-            auto &reg           = decode_reg8(this->opcode & 0x7);
 
             fmt::print("{} A, {}\n", instr_name, reg_name);
 
-            const uint8_t res5  = (this->a() & 0xf) + (reg & 0xf) + (with_carry && this->get_flag_c() ? 1 : 0);
-            const uint16_t res9 = static_cast<uint16_t>(this->a()) + reg + (with_carry && this->get_flag_c() ? 1 : 0);
-            this->a() = res9 & 0xff;
+            const auto &reg           = decode_reg8(this->opcode & 0x7);
+            this->add(reg, with_carry);
 
-            this->set_flag_h(res5 & 0x10 != 0);
-            this->set_flag_c(res9&0x100 != 0);
-            this->set_flag_z(this->a() == 0);
-            this->set_flag_n(0);
             fmt::print("\t\t\t\t\t\t\t\t\t A = A {} {} = ${:02X}\n", instr_name, reg_name, this->a());
             this->pc += 1;
         } break;
@@ -648,8 +666,7 @@ void Cpu::do_tick(Bus &bus) {
                 this->cycle++;
             } else {
                 const auto val = bus.read(this->pc + 1);
-                this->set_flag_z(this->a() == val);
-                this->set_flag_n(true);
+                this->get_sub(val, false);
 
                 fmt::print("\t\t\t\t\t\t\t\t\t a (${:02X}) compared to ${:02X}\n", this->a(), val);
 
