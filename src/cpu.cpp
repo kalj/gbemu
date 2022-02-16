@@ -344,9 +344,30 @@ void Cpu::do_tick(Bus &bus) {
             } else if (this->cycle == 3) {
                 const uint16_t addr = (static_cast<uint16_t>(this->tmp2) << 8) | static_cast<uint16_t>(this->tmp1);
                 bus.write(addr, this->a());
-                fmt::print("\t\t\t\t\t\t\t\t\t a (${:02X}) stored to ${:04X}\n",
+                fmt::print("\t\t\t\t\t\t\t\t\t A (${:02X}) stored to ${:04X}\n",
                            this->a(),
                            addr);
+                this->pc += 3;
+                this->cycle = 0;
+            }
+            break;
+        // load A from immediate address
+        case 0xFA:
+            if (this->cycle == 0) {
+                fmt::print("LD A, (a16)\n");
+                this->cycle++;
+            } else if (this->cycle == 1) {
+                this->tmp1 = bus.read(this->pc + 1);
+                this->cycle++;
+            } else if (this->cycle == 2) {
+                this->tmp2 = bus.read(this->pc + 2);
+                this->cycle++;
+            } else if (this->cycle == 3) {
+                const uint16_t addr = (static_cast<uint16_t>(this->tmp2) << 8) | static_cast<uint16_t>(this->tmp1);
+                this->a() = bus.read(addr);
+                fmt::print("\t\t\t\t\t\t\t\t\t A loaded from ${:04X} (${:02X})\n",
+                           addr,
+                           this->a());
                 this->pc += 3;
                 this->cycle = 0;
             }
