@@ -12,6 +12,9 @@ void Cpu::reset() {
     this->hl.r16 = 0x014d;
     this->sp    = 0xfffe;
     this->pc    = 0x0100;
+
+    this->cycle = 0;
+    this->ime = false;
 }
 
 uint8_t &Cpu::decode_reg8(uint8_t bits) {
@@ -709,6 +712,8 @@ void Cpu::do_tick(Bus &bus) {
         //-------------------------------------------------------
         // Jumps
         //-------------------------------------------------------
+
+        // relative jumps
         case 0x18:
             if(this->cycle == 0) {
                 fmt::print("JR s8\n");
@@ -920,4 +925,5 @@ void Cpu::dump(std::ostream &os) const {
     os << fmt::format("  hl: {:04X}\n", this->hl.r16);
     os << fmt::format("  pc: {:04X}\n", this->pc);
     os << fmt::format("  sp: {:04X}\n", this->sp);
+    os << fmt::format(" ime: {}\n", this->ime);
 }

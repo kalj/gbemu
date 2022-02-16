@@ -224,7 +224,7 @@ int main(int argc, char **argv) {
         std::ofstream fs(state_file);
         fs << "Registers:\n";
         cpu.dump(fs);
-        fs << "Memory dump:\n";
+        fs << "\nMemory dump:\n";
         bus.dump(fs);
         return 1;
     }
