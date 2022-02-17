@@ -816,7 +816,7 @@ void Cpu::do_tick(Bus &bus) {
 
         case 0xC3:
             if(this->cycle == 0) {
-                log(fmt::format("JP nn nn\n"));
+                log(fmt::format("JP a16\n"));
                 this->cycle++;
             } else if (this->cycle == 1) {
                 this->tmp1 = bus.read(this->pc + 1); // addr_l
@@ -831,6 +831,42 @@ void Cpu::do_tick(Bus &bus) {
                 this->cycle = 0;
             }
             break;
+
+        case 0xC2: // JP COND, a16
+        case 0xCA:
+        case 0xD2:
+        case 0xDA:
+            if (this->cycle == 0) {
+                const auto cond_bits = (this->opcode >> 3) & 0x3;
+                const auto cond_str  = cond_bits == 0 ? "NZ" : cond_bits == 1 ? "Z" : cond_bits == 2 ? "NC" : "C";
+                log(fmt::format("JP {}, a16\n", cond_str));
+                this->cycle++;
+            } else if (this->cycle == 1) {
+                this->tmp1 = bus.read(this->pc + 1);
+                this->cycle++;
+            } else if (this->cycle == 2) {
+                this->tmp2 = bus.read(this->pc + 2);
+                this->pc += 3;
+
+                const auto cond_bits = (this->opcode >> 3) & 0x3;
+                const bool cond      = cond_bits == 0   ? !this->get_flag_z()
+                                       : cond_bits == 1 ? this->get_flag_z()
+                                       : cond_bits == 2 ? !this->get_flag_c()
+                                                        : this->get_flag_c();
+                if (cond) {
+                    this->cycle++;
+                } else {
+                    log(fmt::format("\t\t\t\t\t\t\t\t\t absolute jump NOT taken\n"));
+                    this->cycle = 0;
+                }
+            } else if (this->cycle == 3) {
+                const uint16_t new_pc = (static_cast<uint16_t>(this->tmp2) << 8) | static_cast<uint16_t>(this->tmp1);
+                log(fmt::format("\t\t\t\t\t\t\t\t\t conditional jump taken to ${:04X}\n", new_pc));
+                this->pc = new_pc;
+                this->cycle = 0;
+            }
+            break;
+
         // Call
         case 0xCD:
             if(this->cycle == 0) {
@@ -904,10 +940,48 @@ void Cpu::do_tick(Bus &bus) {
                 this->cycle++;
             } else if (this->cycle == 3) {
                 this->pc = (static_cast<uint16_t>(this->tmp2) << 8) | static_cast<uint16_t>(this->tmp1);
-                log(fmt::format("\t\t\t\t\t\t\t\t\t Returning from subroutine\n", this->pc));
+                log(fmt::format("\t\t\t\t\t\t\t\t\t Returning from subroutine\n"));
                 this->cycle = 0;
             }
             break;
+
+        case 0xC0:
+        case 0xC8:
+        case 0xD0: // RET <COND>
+        case 0xD8:
+            if (this->cycle == 0) {
+                const auto cond_bits = (this->opcode >> 3) & 0x3;
+                const auto cond_str  = cond_bits == 0 ? "NZ" : cond_bits == 1 ? "Z" : cond_bits == 2 ? "NC" : "C";
+                log(fmt::format("RET {}\n", cond_str));
+                this->cycle++;
+            } else if (this->cycle == 1) {
+                const auto cond_bits = (this->opcode >> 3) & 0x3;
+                const bool cond      = cond_bits == 0   ? !this->get_flag_z()
+                                       : cond_bits == 1 ? this->get_flag_z()
+                                       : cond_bits == 2 ? !this->get_flag_c()
+                                                        : this->get_flag_c();
+                if (cond) {
+                    this->cycle++;
+                } else {
+                    log(fmt::format("\t\t\t\t\t\t\t\t\t conditional return NOT taken\n"));
+                    this->pc += 1;
+                    this->cycle = 0;
+                }
+            } else if (this->cycle == 2) {
+                this->tmp1 = bus.read(this->sp);
+                this->sp++;
+                this->cycle++;
+            } else if (this->cycle == 3) {
+                this->tmp2 = bus.read(this->sp);
+                this->sp++;
+                this->cycle++;
+            } else if (this->cycle == 4) {
+                this->pc = (static_cast<uint16_t>(this->tmp2) << 8) | static_cast<uint16_t>(this->tmp1);
+                log(fmt::format("\t\t\t\t\t\t\t\t\t conditional return taken\n"));
+                this->cycle = 0;
+            }
+            break;
+
 
         //-------------------------------------------------------
         // Interrupt stuff
