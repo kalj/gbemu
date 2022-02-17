@@ -280,6 +280,23 @@ void Cpu::do_tick(Bus &bus) {
                 this->cycle = 0;
             }
         } break;
+
+        case 0x0A: // LD A, (BC)
+        case 0x1A: // LD A, (DE)
+            if (this->cycle == 0) {
+                const auto reg_name = this->opcode & 0x10 ? "DE" : "BC";
+                log(fmt::format("LD A, ({})\n", reg_name));
+                this->cycle++;
+            } else if (this->cycle == 1) {
+
+                const auto reg_name = this->opcode & 0x10 ? "DE" : "BC";
+                const auto reg      = this->opcode & 0x10 ? this->de.r16 : this->bc.r16;
+                this->a()           = bus.read(reg);
+                log(fmt::format("\t\t\t\t\t\t\t\t\t a (${:02X}) read from ({}) (${:04X})\n", this->a(), reg_name, reg));
+                this->pc += 1;
+                this->cycle = 0;
+            }
+            break;
         case 0x32:
             if (this->cycle == 0) {
                 log(fmt::format("LD (HL-), A\n"));
