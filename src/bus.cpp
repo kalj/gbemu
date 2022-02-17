@@ -1,5 +1,12 @@
 #include "bus.h"
 
+#include "ppu.h"
+#include "sound.h"
+#include "communication.h"
+#include "controller.h"
+#include "div_timer.h"
+#include "interrupt_state.h"
+
 #include "log.h"
 
 #include <fmt/core.h>
@@ -64,17 +71,28 @@ std::string to_string(CartridgeType t) {
     }
 }
 
-
-Bus::Bus(CartridgeType type, const std::vector<uint8_t> &cartridge_rom, uint32_t cram_size)
+Bus::Bus(CartridgeType type,
+         const std::vector<uint8_t> &cartridge_rom,
+         uint32_t ram_size,
+         Controller &cntl,
+         Communication &comm,
+         DivTimer &dt,
+         Sound &snd,
+         Ppu &ppu,
+         InterruptState &is)
     : cartridge_type(type),
       rom(cartridge_rom),
-      vram(8*1024, 0xff),
-      cram(cram_size,0xff),
-      wram(8*1024, 0xff),
+      vram(8 * 1024, 0xff),
+      cram(ram_size, 0xff),
+      wram(8 * 1024, 0xff),
       oam(160, 0),
-      ioreg(128, 0),
-      hram(127, 0xff)
-    {}
+      hram(127, 0xff),
+      controller(cntl),
+      communication(comm),
+      div_timer(dt),
+      sound(snd),
+      ppu(ppu),
+      int_state(is) {}
 
 uint8_t Bus::read(uint16_t addr) const {
     uint8_t data = 0xff;
@@ -98,13 +116,31 @@ uint8_t Bus::read(uint16_t addr) const {
         data = this->oam[addr-0xfe00];
     } else if(addr < 0xff00) {
         throw std::runtime_error(fmt::format("INVALID BUS READ AT ${:04X} (prohibited area)", addr));
+    } else if(addr == 0xff0f || addr == 0xffff) {
+        desc = "InterruptState";
+        data = this->int_state.read_reg(addr-0xff00);
+        fmt::print("        Reading from InterruptState register [${:04X}] -> ${:02X}\n", addr, data);
     } else if(addr < 0xff80) {
         desc = "IO";
-        data = this->ioreg[addr-0xff00];
-        return data;
-    } else if(addr == 0xffff) {
-        desc = "IE reg";
-        data = this->iereg;
+        const uint8_t regid = addr-0xff00;
+        if(regid == 0x00) {
+            data = this->controller.read_reg();
+            fmt::print("        Reading from Controller register [${:04X}] -> ${:02X}\n", addr, data);
+        } else if(regid >= 0x01 && regid <= 0x02) {
+            data = this->communication.read_reg(regid);
+            fmt::print("        Reading from Communication register [${:04X}] -> ${:02X}\n", addr, data);
+        } else if(regid >= 0x04 && regid <= 0x07) {
+            data = this->div_timer.read_reg(regid);
+            fmt::print("        Reading from Div/Timer register [${:04X}] -> ${:02X}\n", addr, data);
+        } else if(regid >= 0x10 && regid <= 0x3f) {
+            data = this->sound.read_reg(regid);
+            fmt::print("        Reading from Sound register [${:04X}] -> ${:02X}\n", addr, data);
+        } else if(regid >= 0x40 && regid <= 0x4b) {
+            data = this->ppu.read_reg(regid);
+            fmt::print("        Reading from PPU register [${:04X}] -> ${:02X}\n", addr, data);
+        } else {
+            throw std::runtime_error(fmt::format("INVALID IO REGISTER READ AT ${:04X}", addr));
+        }
     } else { // 0xff80 - 0xfffe
         desc = "HRAM";
         data = this->hram[addr-0xff80];
@@ -139,13 +175,35 @@ void Bus::write(uint16_t addr, uint8_t data) {
         log(fmt::format("   WARNING: INVALID BUS WRITE AT ${:04X} (prohibited area), data=${:02X}\n", addr, data));
         log(fmt::format("=====================================================================\n"));
         return;
+    } else if(addr == 0xff0f || addr == 0xffff) {
+        desc = "InterruptState";
+        fmt::print("        Writing to InterruptState register [${:04X}] <- ${:02X}\n", addr, data);
+        this->int_state.write_reg(addr-0xff00, data);
     } else if(addr < 0xff80) {
         desc = "IO";
-        this->ioreg[addr-0xff00] = data;
-        return;
+        const uint8_t regid = addr-0xff00;
+        if(regid == 0x00) {
+            fmt::print("        Writing to Controller register [${:04X}] <- ${:02X}\n", addr, data);
+            this->controller.write_reg(data);
+        } else if(regid >= 0x01 && regid <= 0x02) {
+            fmt::print("        Writing to Communication register [${:04X}] <- ${:02X}\n", addr, data);
+            this->communication.write_reg(regid, data);
+        } else if(regid >= 0x04 && regid <= 0x07) {
+            fmt::print("        Writing to Div/Timer register [${:04X}] <- ${:02X}\n", addr, data);
+            this->div_timer.write_reg(regid, data);
+        } else if(regid >= 0x10 && regid <= 0x3f) {
+            fmt::print("        Writing to Sound register [${:04X}] <- ${:02X}\n", addr, data);
+            this->sound.write_reg(regid, data);
+        } else if(regid >= 0x40 && regid <= 0x4b) {
+            fmt::print("        Writing to PPU register [${:04X}] <- ${:02X}\n", addr, data);
+            this->ppu.write_reg(regid, data);
+        } else {
+            log(fmt::format("=====================================================================\n"));
+            log(fmt::format("   WARNING: INVALID IO REGISTER WRITE AT ${:04X} data=${:02X}\n", addr, data));
+            log(fmt::format("=====================================================================\n"));
+            return;
+        }
     } else if(addr == 0xffff) {
-        desc = "IE reg";
-        this->iereg = data;
     } else { // 0xff80 - 0xfffe
         desc = "HRAM";
         this->hram[addr-0xff80] = data;
@@ -195,15 +253,12 @@ void Bus::dump(std::ostream &os) const {
         os << fmt::format(" {:02X}", this->oam[i]);
     }
 
-    os << "\nIO:";
-    for(uint16_t i=0; i<this->ioreg.size(); i++) {
-        const uint16_t a = i+0xff00;
-        if(a%16 == 0) {
-            os << fmt::format("\n${:04X}:", a);
-        }
-
-        os << fmt::format(" {:02X}", this->ioreg[i]);
-    }
+    os << "\nIO:\n";
+    this->controller.dump(os);
+    this->communication.dump(os);
+    this->div_timer.dump(os);
+    this->sound.dump(os);
+    this->ppu.dump(os);
 
     os << "\nHRAM:";
     for(uint16_t i=0; i<this->hram.size(); i++) {
@@ -215,5 +270,5 @@ void Bus::dump(std::ostream &os) const {
         os << fmt::format(" {:02X}", this->hram[i]);
     }
 
-    os << fmt::format("\nIE: {:02X}\n",this->iereg);
+    this->int_state.dump(os);
 }

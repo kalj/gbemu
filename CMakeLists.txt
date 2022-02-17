@@ -23,7 +23,12 @@ endif()
 add_library(common_objects OBJECT
   src/cpu.cpp
   src/bus.cpp
+  src/controller.cpp
+  src/communication.cpp
+  src/div_timer.cpp
+  src/sound.cpp
   src/ppu.cpp
+  src/interrupt_state.cpp
   src/log.cpp
   )
 

@@ -136,6 +136,15 @@ uint8_t Cpu::get_sub(uint8_t val, bool with_carry) {
 void Cpu::do_tick(Bus &bus) {
 
     if(this->cycle == 0) {
+        // check for interrupts:
+        // if (IME && (IE&IF)) {
+        //    go into interrupt
+        // * cycle 0: (check the above)
+        // * cycle 1: (do nothing) // clear IME, and clear the causing bit of IF
+        // * cycle 2-3: push PC
+        // * cycle 4:  set PC to $40/$48/$50/$58/$60
+        // }
+
         this->opcode = bus.read(this->pc);
         log(fmt::format("\t\t\t\t\t\t\t\t read opcode: ${:02X} -> ", this->opcode));
     }
@@ -994,6 +1003,7 @@ void Cpu::do_tick(Bus &bus) {
             this->pc++;
             break;
         case 0xFB:
+            // TODO: EI should only apply after one extra cycle
             // single cycle
             log(fmt::format("EI\n"));
             this->ime = true;

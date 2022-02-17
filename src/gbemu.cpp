@@ -1,6 +1,11 @@
 #include "cpu.h"
 #include "bus.h"
 #include "ppu.h"
+#include "controller.h"
+#include "communication.h"
+#include "sound.h"
+#include "div_timer.h"
+#include "interrupt_state.h"
 #include "log.h"
 
 #include <fmt/core.h>
@@ -149,7 +154,7 @@ int main(int argc, char **argv) {
                header_checksum_computed == header_checksum_expected ? "Valid" : "Invalid");
 
     uint16_t global_checksum_computed = 0;
-    for (int i = 0; i < rom.size(); ++i) {
+    for (size_t i = 0; i < rom.size(); ++i) {
         if (i != 0x14e && i != 0x14f) {
             global_checksum_computed += rom[i];
         }
@@ -160,7 +165,11 @@ int main(int argc, char **argv) {
                global_checksum_expected,
                global_checksum_computed == global_checksum_expected ? "Valid" : "Invalid");
 
-    Bus bus{cartridge_type, cartridge_rom_contents, ram_size};
+    Sound snd;
+    Controller cntl;
+    Communication comm;
+    DivTimer dt;
+    InterruptState int_state;
 
     Cpu cpu;
     cpu.reset();
@@ -194,19 +203,21 @@ int main(int argc, char **argv) {
 
     Ppu ppu;
 
-    log_set_enable(true);
+    Bus bus{cartridge_type, cartridge_rom_contents, ram_size, cntl, comm, dt, snd, ppu, int_state};
+
+    log_set_enable(false);
     fmt::print("------------------------------------------------------\n");
     fmt::print("Starting execution\n\n");
 
     try {
         for(int i=0;;i++) {
 
-            fmt::print(" === [CPU cycle = {}]\n", i);
+            log(fmt::format(" === [CPU cycle = {}]\n", i));
             cpu.do_tick(bus);
 
             for(int j=0; j<4; j++) {
                 // fmt::print(" === [PPU cycle = {}]\n", 4*i+j);
-                ppu.do_tick(pixel_buffer, bus);
+                ppu.do_tick(pixel_buffer, bus, int_state);
             }
 
             // if(i%(70224/4) == 0) {

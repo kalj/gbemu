@@ -35,9 +35,25 @@ enum class CartridgeType: uint8_t {
 
 std::string to_string(CartridgeType t);
 
+class InterruptState;
+class Controller;
+class Ppu;
+class DivTimer;
+class Sound;
+class Communication;
+
 class Bus {
 public:
-    Bus(CartridgeType type, const std::vector<uint8_t> &cartridge_rom, uint32_t ram_size);
+    Bus(CartridgeType type,
+        const std::vector<uint8_t> &cartridge_rom,
+        uint32_t ram_size,
+        Controller &cntl,
+        Communication &comm,
+        DivTimer &dt,
+        Sound &snd,
+        Ppu &ppu,
+        InterruptState &is);
+
     uint8_t read(uint16_t addr) const;
     void write(uint16_t addr, uint8_t data);
     void dump(std::ostream &os) const;
@@ -49,10 +65,14 @@ private:
     std::vector<uint8_t> cram;
     std::vector<uint8_t> wram;
     std::vector<uint8_t> oam;
-    std::vector<uint8_t> ioreg;
     std::vector<uint8_t> hram;
-    uint8_t iereg{0};
-    // std::vector<std::unique_ptr<BusDevice>> bus_devices;
+
+    Controller &controller;
+    Communication &communication;
+    DivTimer &div_timer;
+    Sound &sound;
+    Ppu &ppu;
+    InterruptState &int_state;
 };
 
 
