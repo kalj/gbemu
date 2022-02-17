@@ -758,18 +758,29 @@ void Cpu::do_tick(Bus &bus) {
             }
             break;
 
-        case 0x20:
-            if(this->cycle == 0) {
-                fmt::print("JR NZ, s8\n");
+        case 0x20: // JR COND, s8
+        case 0x28:
+        case 0x30:
+        case 0x38:
+            if (this->cycle == 0) {
+                const auto cond_bits = (this->opcode >> 3) & 0x3;
+                const auto cond_str  = cond_bits == 0 ? "NZ" : cond_bits == 1 ? "Z" : cond_bits == 2 ? "NC" : "C";
+                log(fmt::format("JR {}, s8\n", cond_str));
                 this->cycle++;
             } else if (this->cycle == 1) {
-                if(!get_flag_z()) {
-                    this->tmp1 = bus.read(this->pc+1);
+
+                const auto cond_bits = (this->opcode >> 3) & 0x3;
+                const bool cond      = cond_bits == 0   ? !this->get_flag_z()
+                                       : cond_bits == 1 ? this->get_flag_z()
+                                       : cond_bits == 2 ? !this->get_flag_c()
+                                                        : this->get_flag_c();
+                if (cond) {
+                    this->tmp1 = bus.read(this->pc + 1);
                     this->cycle++;
                 } else {
                     log(fmt::format("\t\t\t\t\t\t\t\t\t relative jump NOT taken\n"));
                     this->pc += 2;
-                    this->cycle=0;
+                    this->cycle = 0;
                 }
             } else if (this->cycle == 2) {
                 const int16_t offset = static_cast<int8_t>(this->tmp1);
