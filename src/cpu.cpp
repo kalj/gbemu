@@ -114,8 +114,8 @@ void Cpu::add(uint8_t val, bool with_carry) {
     const uint16_t res9 = static_cast<uint16_t>(this->a()) + val + (with_carry && this->get_flag_c() ? 1 : 0);
     this->a() = res9 & 0xff;
 
-    this->set_flag_h(res5 & 0x10 != 0);
-    this->set_flag_c(res9&0x100 != 0);
+    this->set_flag_h(res5 & 0x10);
+    this->set_flag_c(res9&0x100);
     this->set_flag_z(this->a() == 0);
     this->set_flag_n(false);
 }
