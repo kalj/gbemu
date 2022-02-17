@@ -13,16 +13,15 @@ if (CMAKE_GENERATOR STREQUAL "Ninja")
   endif()
 endif()
 
-
-set(SOURCES
-  src/gbemu.cpp
+add_library(common_objects OBJECT
   src/cpu.cpp
   src/bus.cpp
   src/ppu.cpp
   src/log.cpp
   )
 
-add_executable(gbemu
-  ${SOURCES})
+add_executable(gbemu src/gbemu.cpp)
+target_link_libraries(gbemu common_objects fmt)
 
-target_link_libraries(gbemu fmt)
+add_executable(get_opcodes src/get_opcodes.cpp)
+target_link_libraries(get_opcodes common_objects fmt)
