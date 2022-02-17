@@ -1,6 +1,7 @@
 #include "cpu.h"
 #include "bus.h"
 #include "ppu.h"
+#include "log.h"
 
 #include <fmt/core.h>
 #include <cstdint>
@@ -193,6 +194,7 @@ int main(int argc, char **argv) {
 
     Ppu ppu;
 
+    log_set_enable(true);
     fmt::print("------------------------------------------------------\n");
     fmt::print("Starting execution\n\n");
 

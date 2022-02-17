@@ -1,5 +1,6 @@
 #include "ppu.h"
 
+#include "log.h"
 #include "bus.h"
 
 #define REG_DMA 0xFF46

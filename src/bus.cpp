@@ -1,5 +1,7 @@
 #include "bus.h"
 
+#include "log.h"
+
 #include <fmt/core.h>
 
 std::string to_string(CartridgeType t) {
@@ -107,16 +109,16 @@ uint8_t Bus::read(uint16_t addr) const {
         desc = "HRAM";
         data = this->hram[addr-0xff80];
     }
-    fmt::print("        BUS [${:04X}] -> ${:02X} ({})\n", addr, data, desc);
+    log(fmt::format("        BUS [${:04X}] -> ${:02X} ({})\n", addr, data, desc));
     return data;
 }
 
 void Bus::write(uint16_t addr, uint8_t data) {
     std::string desc = "";
     if(addr < 0x8000) {
-        fmt::print("=========================================================\n");
-        fmt::print("   WARNING: INVALID BUS WRITE AT ${:04X} (ROM), data=${:02X}\n", addr, data);
-        fmt::print("=========================================================\n");
+        log(fmt::format("=========================================================\n"));
+        log(fmt::format("   WARNING: INVALID BUS WRITE AT ${:04X} (ROM), data=${:02X}\n", addr, data));
+        log(fmt::format("=========================================================\n"));
         return;
     } else if(addr < 0xa000) {
         desc = "VRAM";
@@ -133,9 +135,9 @@ void Bus::write(uint16_t addr, uint8_t data) {
         desc = "OAM";
         this->oam[addr-0xfe00] = data;
     } else if(addr < 0xff00) {
-        fmt::print("=====================================================================\n");
-        fmt::print("   WARNING: INVALID BUS WRITE AT ${:04X} (prohibited area), data=${:02X}\n", addr, data);
-        fmt::print("=====================================================================\n");
+        log(fmt::format("=====================================================================\n"));
+        log(fmt::format("   WARNING: INVALID BUS WRITE AT ${:04X} (prohibited area), data=${:02X}\n", addr, data));
+        log(fmt::format("=====================================================================\n"));
         return;
     } else if(addr < 0xff80) {
         desc = "IO";
@@ -148,7 +150,7 @@ void Bus::write(uint16_t addr, uint8_t data) {
         desc = "HRAM";
         this->hram[addr-0xff80] = data;
     }
-    fmt::print("        BUS [${:04X}] <- ${:02X}  ({})\n", addr, data, desc);
+    log(fmt::format("        BUS [${:04X}] <- ${:02X}  ({})\n", addr, data, desc));
 }
 
 void Bus::dump(std::ostream &os) const {

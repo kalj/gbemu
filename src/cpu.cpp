@@ -1,5 +1,6 @@
 #include "cpu.h"
 
+#include "log.h"
 #include "bus.h"
 
 #include <fmt/core.h>
@@ -132,17 +133,16 @@ uint8_t Cpu::get_sub(uint8_t val, bool with_carry) {
     return res;
 }
 
-
 void Cpu::do_tick(Bus &bus) {
 
     if(this->cycle == 0) {
         this->opcode = bus.read(this->pc);
-        fmt::print("\t\t\t\t\t\t\t\t read opcode: ${:02X} -> ", this->opcode);
+        log(fmt::format("\t\t\t\t\t\t\t\t read opcode: ${:02X} -> ", this->opcode));
     }
 
     switch (this->opcode) {
         case 0x00:
-            fmt::print("NOP\n");
+            log(fmt::format("NOP\n"));
             this->pc += 1;
             this->cycle = 0; // start over
             break;
@@ -213,9 +213,9 @@ void Cpu::do_tick(Bus &bus) {
                 const auto dst_name = decode_reg8_name((this->opcode >> 3) & 0x7);
                 const auto &src           = decode_reg8(this->opcode & 0x7);
                 auto &dst           = decode_reg8((this->opcode >> 3) & 0x7);
-                fmt::print("LD {}, {}\n", dst_name, src_name);
+                log(fmt::format("LD {}, {}\n", dst_name, src_name));
                 dst = src;
-                fmt::print("\t\t\t\t\t\t\t\t\t {} loaded from {} (${:02X})\n", dst_name, src_name, dst);
+                log(fmt::format("\t\t\t\t\t\t\t\t\t {} loaded from {} (${:02X})\n", dst_name, src_name, dst));
                 this->pc += 1;
             }
             break;
@@ -228,14 +228,14 @@ void Cpu::do_tick(Bus &bus) {
         case 0x7E:
             if (this->cycle == 0) {
                 const auto reg_name = decode_reg8_name((this->opcode >> 3) & 0x7);
-                fmt::print("LD {}, (HL)\n", reg_name);
+                log(fmt::format("LD {}, (HL)\n", reg_name));
                 this->cycle++;
             } else {
                 const auto reg_name = decode_reg8_name((this->opcode >> 3) & 0x7);
                 auto &reg           = decode_reg8((this->opcode >> 3) & 0x7);
 
                 reg                 = bus.read(this->hl.r16);
-                fmt::print("\t\t\t\t\t\t\t\t\t {} loaded from (HL) (${:04X}) = ${:02X}\n", reg_name, this->hl.r16, reg);
+                log(fmt::format("\t\t\t\t\t\t\t\t\t {} loaded from (HL) (${:04X}) = ${:02X}\n", reg_name, this->hl.r16, reg));
                 this->pc += 1;
                 this->cycle = 0;
             }
@@ -250,13 +250,13 @@ void Cpu::do_tick(Bus &bus) {
         case 0x3E: // LD A, d8    0011 1110
             if (this->cycle == 0) {
                 const auto reg_name = decode_reg8_name((this->opcode >> 3) & 0x7);
-                fmt::print("LD {}, d8\n", reg_name);
+                log(fmt::format("LD {}, d8\n", reg_name));
                 this->cycle++;
             } else {
                 const auto reg_name = decode_reg8_name((this->opcode >> 3) & 0x7);
                 auto &reg           = decode_reg8((this->opcode >> 3) & 0x7);
                 reg                 = bus.read(this->pc + 1);
-                fmt::print("\t\t\t\t\t\t\t\t\t {} set to ${:02X}\n", reg_name, reg);
+                log(fmt::format("\t\t\t\t\t\t\t\t\t {} set to ${:02X}\n", reg_name, reg));
                 this->pc += 2;
                 this->cycle = 0;
             }
@@ -265,16 +265,16 @@ void Cpu::do_tick(Bus &bus) {
         case 0x36: // LD (HL), d8
         {
             if (this->cycle == 0) {
-                fmt::print("LD (HL), d8\n");
+                log(fmt::format("LD (HL), d8\n"));
                 this->cycle++;
             } else if (this->cycle == 1) {
                 this->tmp1 = bus.read(this->pc + 1);
                 this->cycle++;
             } else {
                 bus.write(this->hl.r16, this->tmp1);
-                fmt::print("\t\t\t\t\t\t\t\t\t ${:02X} stored to (hl) (${:04X})\n",
-                           this->tmp1,
-                           this->hl.r16);
+                log(fmt::format("\t\t\t\t\t\t\t\t\t ${:02X} stored to (hl) (${:04X})\n",
+                                this->tmp1,
+                                this->hl.r16));
 
                 this->pc += 2;
                 this->cycle = 0;
@@ -282,13 +282,13 @@ void Cpu::do_tick(Bus &bus) {
         } break;
         case 0x32:
             if (this->cycle == 0) {
-                fmt::print("LD (HL-), A\n");
+                log(fmt::format("LD (HL-), A\n"));
                 this->cycle++;
             } else if (this->cycle == 1) {
                 bus.write(this->hl.r16, this->a());
-                fmt::print("\t\t\t\t\t\t\t\t\t a (${:02X}) stored to (hl) (${:04X}), and hl decremented\n",
-                           this->a(),
-                           this->hl.r16);
+                log(fmt::format("\t\t\t\t\t\t\t\t\t a (${:02X}) stored to (hl) (${:04X}), and hl decremented\n",
+                                this->a(),
+                                this->hl.r16));
                 this->hl.r16--;
                 this->pc += 1;
                 this->cycle = 0;
@@ -296,13 +296,13 @@ void Cpu::do_tick(Bus &bus) {
             break;
         case 0x2A: // LD A, (HL+)
             if (this->cycle == 0) {
-                fmt::print("LD A, (HL+)\n");
+                log(fmt::format("LD A, (HL+)\n"));
                 this->cycle++;
             } else if (this->cycle == 1) {
                 this->a() = bus.read(this->hl.r16);
-                fmt::print("\t\t\t\t\t\t\t\t\t a (${:02X}) read from (hl) (${:04X}), and hl incremented\n",
-                           this->a(),
-                           this->hl.r16);
+                log(fmt::format("\t\t\t\t\t\t\t\t\t a (${:02X}) read from (hl) (${:04X}), and hl incremented\n",
+                                this->a(),
+                                this->hl.r16));
                 this->hl.r16++;
                 this->pc += 1;
                 this->cycle = 0;
@@ -316,7 +316,7 @@ void Cpu::do_tick(Bus &bus) {
         case 0x31: // LD SP, d16
             if (this->cycle == 0) {
                 const auto reg_name = decode_reg16_name((this->opcode>>4)&0x3);
-                fmt::print("LD {}, d16\n", reg_name);
+                log(fmt::format("LD {}, d16\n", reg_name));
                 this->cycle++;
             } else if (this->cycle == 1) {
                 this->tmp1 = bus.read(this->pc + 1);
@@ -327,7 +327,7 @@ void Cpu::do_tick(Bus &bus) {
 
                 reg = static_cast<uint16_t>(bus.read(this->pc + 2))<<8 | this->tmp1;
 
-                fmt::print("\t\t\t\t\t\t\t\t\t {} set to ${:04X}\n", reg_name, reg);
+                log(fmt::format("\t\t\t\t\t\t\t\t\t {} set to ${:04X}\n", reg_name, reg));
                 this->pc += 3;
                 this->cycle = 0;
             }
@@ -336,7 +336,7 @@ void Cpu::do_tick(Bus &bus) {
         // store A to immediate address
         case 0xEA:
             if (this->cycle == 0) {
-                fmt::print("LD (a16), A\n");
+                log(fmt::format("LD (a16), A\n"));
                 this->cycle++;
             } else if (this->cycle == 1) {
                 this->tmp1 = bus.read(this->pc + 1);
@@ -347,9 +347,9 @@ void Cpu::do_tick(Bus &bus) {
             } else if (this->cycle == 3) {
                 const uint16_t addr = (static_cast<uint16_t>(this->tmp2) << 8) | static_cast<uint16_t>(this->tmp1);
                 bus.write(addr, this->a());
-                fmt::print("\t\t\t\t\t\t\t\t\t A (${:02X}) stored to ${:04X}\n",
-                           this->a(),
-                           addr);
+                log(fmt::format("\t\t\t\t\t\t\t\t\t A (${:02X}) stored to ${:04X}\n",
+                                this->a(),
+                                addr));
                 this->pc += 3;
                 this->cycle = 0;
             }
@@ -357,7 +357,7 @@ void Cpu::do_tick(Bus &bus) {
         // load A from immediate address
         case 0xFA:
             if (this->cycle == 0) {
-                fmt::print("LD A, (a16)\n");
+                log(fmt::format("LD A, (a16)\n"));
                 this->cycle++;
             } else if (this->cycle == 1) {
                 this->tmp1 = bus.read(this->pc + 1);
@@ -368,9 +368,9 @@ void Cpu::do_tick(Bus &bus) {
             } else if (this->cycle == 3) {
                 const uint16_t addr = (static_cast<uint16_t>(this->tmp2) << 8) | static_cast<uint16_t>(this->tmp1);
                 this->a() = bus.read(addr);
-                fmt::print("\t\t\t\t\t\t\t\t\t A loaded from ${:04X} (${:02X})\n",
-                           addr,
-                           this->a());
+                log(fmt::format("\t\t\t\t\t\t\t\t\t A loaded from ${:04X} (${:02X})\n",
+                                addr,
+                                this->a()));
                 this->pc += 3;
                 this->cycle = 0;
             }
@@ -379,14 +379,14 @@ void Cpu::do_tick(Bus &bus) {
         // IO/HRAM PAGE LD instructions
         case 0xE0:
             if (this->cycle == 0) {
-                fmt::print("LD (a8), A\n");
+                log(fmt::format("LD (a8), A\n"));
                 this->cycle++;
             } else if (this->cycle == 1) {
                 this->tmp1 = bus.read(this->pc + 1);
                 this->cycle++;
             } else {
                 const uint16_t addr = 0xff00 | this->tmp1;
-                fmt::print("\t\t\t\t\t\t\t\t\t a (${:02X}) stored to (${:04X})\n", this->a(), addr);
+                log(fmt::format("\t\t\t\t\t\t\t\t\t a (${:02X}) stored to (${:04X})\n", this->a(), addr));
                 bus.write(addr, this->a());
                 this->pc += 2;
                 this->cycle = 0;
@@ -394,7 +394,7 @@ void Cpu::do_tick(Bus &bus) {
             break;
         case 0xF0:
             if(this->cycle == 0) {
-                fmt::print("LD A, (a8)\n");
+                log(fmt::format("LD A, (a8)\n"));
                 this->cycle++;
             } else if (this->cycle == 1) {
                 this->tmp1 = bus.read(this->pc + 1);
@@ -402,18 +402,18 @@ void Cpu::do_tick(Bus &bus) {
             } else {
                 const uint16_t addr = 0xff00 | this->tmp1;
                 this->a() = bus.read(addr);
-                fmt::print("\t\t\t\t\t\t\t\t\t a (${:02X}) read from (${:04X})\n", this->a(), addr);
+                log(fmt::format("\t\t\t\t\t\t\t\t\t a (${:02X}) read from (${:04X})\n", this->a(), addr));
                 this->pc += 2;
                 this->cycle = 0;
             }
             break;
         case 0xE2:
             if (this->cycle == 0) {
-                fmt::print("LD (C), A\n");
+                log(fmt::format("LD (C), A\n"));
                 this->cycle++;
             } else if (this->cycle == 1) {
                 const uint16_t addr = 0xff00 | this->bc.r8.lo; // (0xff00|c)
-                fmt::print("\t\t\t\t\t\t\t\t\t a (${:02X}) stored to (${:04X})\n", this->a(), addr);
+                log(fmt::format("\t\t\t\t\t\t\t\t\t a (${:02X}) stored to (${:04X})\n", this->a(), addr));
                 bus.write(addr, this->a());
                 this->pc += 1;
                 this->cycle = 0;
@@ -431,7 +431,7 @@ void Cpu::do_tick(Bus &bus) {
             const auto reg_name = decode_stack_reg16_name((this->opcode >> 4) & 0x3);
             auto &reg           = decode_stack_reg16((this->opcode >> 4) & 0x3);
             if (this->cycle == 0) {
-                fmt::print("POP {}\n", reg_name);
+                log(fmt::format("POP {}\n", reg_name));
                 this->cycle++;
             } else if (this->cycle == 1) {
                 this->tmp1 = bus.read(this->sp);
@@ -441,7 +441,7 @@ void Cpu::do_tick(Bus &bus) {
                 this->tmp2 = bus.read(this->sp);
                 this->sp++;
                 reg = static_cast<uint16_t>(this->tmp1) << 8 | this->tmp2;
-                fmt::print("\t\t\t\t\t\t\t\t\t POP {} from stack: ${:04X}\n", reg_name, reg);
+                log(fmt::format("\t\t\t\t\t\t\t\t\t POP {} from stack: ${:04X}\n", reg_name, reg));
                 this->pc += 1;
                 this->cycle = 0;
             }
@@ -454,7 +454,7 @@ void Cpu::do_tick(Bus &bus) {
             const auto reg_name = decode_stack_reg16_name((this->opcode >> 4) & 0x3);
             auto &reg           = decode_stack_reg16((this->opcode >> 4) & 0x3);
             if (this->cycle == 0) {
-                fmt::print("PUSH {}\n", reg_name);
+                log(fmt::format("PUSH {}\n", reg_name));
                 this->cycle++;
             } else if (this->cycle == 1) {
                 this->sp--;
@@ -465,7 +465,7 @@ void Cpu::do_tick(Bus &bus) {
                 bus.write(this->sp, reg & 0xff);
                 this->cycle++;
             } else {
-                fmt::print("\t\t\t\t\t\t\t\t\t pushed {} from to stack: ${:04X}\n", reg_name, reg);
+                log(fmt::format("\t\t\t\t\t\t\t\t\t pushed {} from to stack: ${:04X}\n", reg_name, reg));
                 this->pc += 1;
                 this->cycle = 0;
             }
@@ -492,16 +492,15 @@ void Cpu::do_tick(Bus &bus) {
         case 0x8f:
         {
             const bool with_carry = this->opcode & 0x08;
-
             const auto instr_name = with_carry ? "ADC" : "ADD";
             const auto reg_name = decode_reg8_name(this->opcode & 0x7);
 
-            fmt::print("{} A, {}\n", instr_name, reg_name);
+            log(fmt::format("{} A, {}\n", instr_name, reg_name));
 
             const auto &reg           = decode_reg8(this->opcode & 0x7);
             this->add(reg, with_carry);
 
-            fmt::print("\t\t\t\t\t\t\t\t\t A = A {} {} = ${:02X}\n", instr_name, reg_name, this->a());
+            log(fmt::format("\t\t\t\t\t\t\t\t\t A = A {} {} = ${:02X}\n", instr_name, reg_name, this->a()));
             this->pc += 1;
         } break;
 
@@ -511,7 +510,7 @@ void Cpu::do_tick(Bus &bus) {
         case 0x39:
             if (this->cycle == 0) {
                 const auto reg_name = decode_reg16_name((this->opcode>>4) & 0x3);
-                fmt::print("ADD HL, {}\n", reg_name);
+                log(fmt::format("ADD HL, {}\n", reg_name));
                 this->cycle++;
             } else if (this->cycle == 1) {
 
@@ -524,7 +523,7 @@ void Cpu::do_tick(Bus &bus) {
                 this->set_flag_c(res17 & 0x10000);
                 this->set_flag_n(0);
                 const auto reg_name = decode_reg16_name((this->opcode>>4) & 0x3);
-                fmt::print("\t\t\t\t\t\t\t\t\t HL = HL + {} = ${:04X}\n", reg_name, this->hl.r16);
+                log(fmt::format("\t\t\t\t\t\t\t\t\t HL = HL + {} = ${:04X}\n", reg_name, this->hl.r16));
                 this->pc += 1;
                 this->cycle = 0;
             }
@@ -541,22 +540,22 @@ void Cpu::do_tick(Bus &bus) {
             const auto reg_name = decode_reg8_name(this->opcode & 0x7);
             auto &reg           = decode_reg8(this->opcode & 0x7);
 
-            fmt::print("AND {}\n", reg_name);
+            log(fmt::format("AND {}\n", reg_name));
             this->a()     &= reg;
             this->flags() = (this->a() == 0) ? 0x80 : 0x00;
-            fmt::print("\t\t\t\t\t\t\t\t\t A = A AND {} = ${:02X}\n", reg_name, this->a());
+            log(fmt::format("\t\t\t\t\t\t\t\t\t A = A AND {} = ${:02X}\n", reg_name, this->a()));
             this->pc += 1;
         } break;
 
         case 0xE6: // AND A, d8
             if (this->cycle == 0) {
-                fmt::print("LD A, d8\n");
+                log(fmt::format("LD A, d8\n"));
                 this->cycle++;
             } else if (this->cycle == 1) {
                 const auto v = bus.read(this->pc + 1);
                 this->a() &= v;
                 this->flags() = (this->a() == 0) ? 0b10100000 : 0b00100000;
-                fmt::print("\t\t\t\t\t\t\t\t\t A = A AND ${:02X} = ${:02X}\n", v, this->a());
+                log(fmt::format("\t\t\t\t\t\t\t\t\t A = A AND ${:02X} = ${:02X}\n", v, this->a()));
                 this->pc += 2;
                 this->cycle = 0;
             }
@@ -573,10 +572,10 @@ void Cpu::do_tick(Bus &bus) {
             const auto reg_name = decode_reg8_name(this->opcode & 0x7);
             auto &reg           = decode_reg8(this->opcode & 0x7);
 
-            fmt::print("XOR {}\n", reg_name);
+            log(fmt::format("XOR {}\n", reg_name));
             this->a()     ^= reg;
             this->flags() = (this->a() == 0) ? 0x80 : 0x00;
-            fmt::print("\t\t\t\t\t\t\t\t\t A = A XOR {} = ${:02X}\n", reg_name, this->a());
+            log(fmt::format("\t\t\t\t\t\t\t\t\t A = A XOR {} = ${:02X}\n", reg_name, this->a()));
             this->pc += 1;
         } break;
 
@@ -591,10 +590,10 @@ void Cpu::do_tick(Bus &bus) {
             const auto reg_name = decode_reg8_name(this->opcode & 0x7);
             auto &reg           = decode_reg8(this->opcode & 0x7);
 
-            fmt::print("OR {}\n", reg_name);
+            log(fmt::format("OR {}\n", reg_name));
             this->a()     |= reg;
             this->flags() = (this->a() == 0) ? 0x80 : 0x00;
-            fmt::print("\t\t\t\t\t\t\t\t\t A = A OR {} = ${:02X}\n", reg_name, this->a());
+            log(fmt::format("\t\t\t\t\t\t\t\t\t A = A OR {} = ${:02X}\n", reg_name, this->a()));
             this->pc += 1;
         } break;
 
@@ -610,13 +609,13 @@ void Cpu::do_tick(Bus &bus) {
             const auto reg_name = decode_reg8_name((this->opcode>>3)&0x7);
             auto &reg = decode_reg8((this->opcode>>3)&0x7);
 
-            fmt::print("DEC {}\n", reg_name);
+            log(fmt::format("DEC {}\n", reg_name));
 
             reg -= 1;
             this->set_flag_z(reg==0);
             this->set_flag_n(true);
 
-            fmt::print("\t\t\t\t\t\t\t\t\t {} decremented to ${:02X}\n", reg_name, reg);
+            log(fmt::format("\t\t\t\t\t\t\t\t\t {} decremented to ${:02X}\n", reg_name, reg));
 
             this->pc += 1;
             break;
@@ -634,13 +633,13 @@ void Cpu::do_tick(Bus &bus) {
             const auto reg_name = decode_reg8_name((this->opcode >> 3) & 0x7);
             auto &reg           = decode_reg8((this->opcode >> 3) & 0x7);
 
-            fmt::print("INC {}\n", reg_name);
+            log(fmt::format("INC {}\n", reg_name));
 
             reg += 1;
             this->set_flag_z(reg == 0);
             this->set_flag_n(false);
 
-            fmt::print("\t\t\t\t\t\t\t\t\t {} incremented to ${:02X}\n", reg_name, reg);
+            log(fmt::format("\t\t\t\t\t\t\t\t\t {} incremented to ${:02X}\n", reg_name, reg));
 
             this->pc += 1;
         } break;
@@ -652,13 +651,13 @@ void Cpu::do_tick(Bus &bus) {
         case 0x3B:
             if (this->cycle == 0) {
                 const auto reg_name = decode_reg16_name((this->opcode >> 4) & 0x3);
-                fmt::print("DEC {}\n", reg_name);
+                log(fmt::format("DEC {}\n", reg_name));
                 this->cycle++;
             } else if (this->cycle == 1) {
                 const auto reg_name = decode_reg16_name((this->opcode >> 4) & 0x3);
                 auto &reg           = decode_reg16((this->opcode >> 4) & 0x3);
                 reg--;
-                fmt::print("\t\t\t\t\t\t\t\t\t {} decremented ${:04X}\n", reg_name, reg);
+                log(fmt::format("\t\t\t\t\t\t\t\t\t {} decremented ${:04X}\n", reg_name, reg));
                 this->pc += 1;
                 this->cycle = 0;
             }
@@ -671,13 +670,13 @@ void Cpu::do_tick(Bus &bus) {
         case 0x33:
             if (this->cycle == 0) {
                 const auto reg_name = decode_reg16_name((this->opcode >> 4) & 0x3);
-                fmt::print("INC {}\n", reg_name);
+                log(fmt::format("INC {}\n", reg_name));
                 this->cycle++;
             } else if (this->cycle == 1) {
                 const auto reg_name = decode_reg16_name((this->opcode >> 4) & 0x3);
                 auto &reg           = decode_reg16((this->opcode >> 4) & 0x3);
                 reg++;
-                fmt::print("\t\t\t\t\t\t\t\t\t {} incremented ${:04X}\n", reg_name, reg);
+                log(fmt::format("\t\t\t\t\t\t\t\t\t {} incremented ${:04X}\n", reg_name, reg));
                 this->pc += 1;
                 this->cycle = 0;
             }
@@ -686,13 +685,13 @@ void Cpu::do_tick(Bus &bus) {
         // Comparison
         case 0xFE:
             if(this->cycle == 0) {
-                fmt::print("CP d8\n");
+                log(fmt::format("CP d8\n"));
                 this->cycle++;
             } else {
                 const auto val = bus.read(this->pc + 1);
                 this->get_sub(val, false);
 
-                fmt::print("\t\t\t\t\t\t\t\t\t a (${:02X}) compared to ${:02X}\n", this->a(), val);
+                log(fmt::format("\t\t\t\t\t\t\t\t\t a (${:02X}) compared to ${:02X}\n", this->a(), val));
 
                 this->pc += 2;
                 this->cycle=0;
@@ -702,10 +701,10 @@ void Cpu::do_tick(Bus &bus) {
         // Complement
         case 0x2F: // CPL
         {
-            fmt::print("CPL\n");
+            log(fmt::format("CPL\n"));
             this->a()     = ~(this->a());
             this->flags() = (this->a() & 0b10010000) | 0b01100000;
-            fmt::print("\t\t\t\t\t\t\t\t\t A = ~A = ${:02X}\n", this->a());
+            log(fmt::format("\t\t\t\t\t\t\t\t\t A = ~A = ${:02X}\n", this->a()));
             this->pc += 1;
         } break;
 
@@ -716,7 +715,7 @@ void Cpu::do_tick(Bus &bus) {
         // relative jumps
         case 0x18:
             if(this->cycle == 0) {
-                fmt::print("JR s8\n");
+                log(fmt::format("JR s8\n"));
                 this->cycle++;
             } else if (this->cycle == 1) {
                 this->tmp1 = bus.read(this->pc+1);
@@ -724,7 +723,7 @@ void Cpu::do_tick(Bus &bus) {
             } else if (this->cycle == 2) {
                 const int16_t offset = static_cast<int8_t>(this->tmp1);
                 this->pc += offset+2;
-                fmt::print("\t\t\t\t\t\t\t\t\t doing relative jump with offset {} to ${:04X}\n", offset, this->pc);
+                log(fmt::format("\t\t\t\t\t\t\t\t\t doing relative jump with offset {} to ${:04X}\n", offset, this->pc));
                 this->cycle=0;
             }
             break;
@@ -738,28 +737,28 @@ void Cpu::do_tick(Bus &bus) {
                     this->tmp1 = bus.read(this->pc+1);
                     this->cycle++;
                 } else {
-                    fmt::print("\t\t\t\t\t\t\t\t\t relative jump NOT taken\n");
+                    log(fmt::format("\t\t\t\t\t\t\t\t\t relative jump NOT taken\n"));
                     this->pc += 2;
                     this->cycle=0;
                 }
             } else if (this->cycle == 2) {
                 const int16_t offset = static_cast<int8_t>(this->tmp1);
-                this->pc += offset+2; // extra 2 ?
-                fmt::print("\t\t\t\t\t\t\t\t\t relative jump taken with offset {} to ${:04X}\n", offset, this->pc);
-                this->cycle=0;
+                this->pc += offset + 2; // extra 2 ?
+                log(fmt::format("\t\t\t\t\t\t\t\t\t relative jump taken with offset {} to ${:04X}\n", offset, this->pc));
+                this->cycle = 0;
             }
             break;
 
         case 0xE9: {
-                fmt::print("JP HL\n");
+                log(fmt::format("JP HL\n"));
                 this->pc = this->hl.r16;
-                fmt::print("\t\t\t\t\t\t\t\t\t jumping to address in HL (${:04X})\n", this->pc);
+                log(fmt::format("\t\t\t\t\t\t\t\t\t jumping to address in HL (${:04X})\n", this->pc));
             }
             break;
 
         case 0xC3:
             if(this->cycle == 0) {
-                fmt::print("JP nn nn\n");
+                log(fmt::format("JP nn nn\n"));
                 this->cycle++;
             } else if (this->cycle == 1) {
                 this->tmp1 = bus.read(this->pc + 1); // addr_l
@@ -769,7 +768,7 @@ void Cpu::do_tick(Bus &bus) {
                 this->cycle++;
             } else if (this->cycle == 3) {
                 const uint16_t new_pc = (static_cast<uint16_t>(this->tmp2) << 8) | static_cast<uint16_t>(this->tmp1);
-                fmt::print("\t\t\t\t\t\t\t\t\t Jumping to: ${:04X}\n", new_pc);
+                log(fmt::format("\t\t\t\t\t\t\t\t\t Jumping to: ${:04X}\n", new_pc));
                 this->pc = new_pc;
                 this->cycle = 0;
             }
@@ -777,7 +776,7 @@ void Cpu::do_tick(Bus &bus) {
         // Call
         case 0xCD:
             if(this->cycle == 0) {
-                fmt::print("CALL a16\n");
+                log(fmt::format("CALL a16\n"));
                 this->cycle++;
             } else if (this->cycle == 1) {
                 this->tmp1 = bus.read(this->pc + 1); // addr_l
@@ -796,7 +795,7 @@ void Cpu::do_tick(Bus &bus) {
                 this->cycle++;
             } else if (this->cycle == 5) {
                 this->pc = (static_cast<uint16_t>(this->tmp2) << 8) | static_cast<uint16_t>(this->tmp1);
-                fmt::print("\t\t\t\t\t\t\t\t\t Calling subroutine at: ${:04X}\n", this->pc);
+                log(fmt::format("\t\t\t\t\t\t\t\t\t Calling subroutine at: ${:04X}\n", this->pc));
                 this->cycle = 0;
             }
             break;
@@ -812,7 +811,7 @@ void Cpu::do_tick(Bus &bus) {
         case 0xFF:
             if(this->cycle == 0) {
                 this->tmp1 = (this->opcode>>3)&0x7;
-                fmt::print("RST {}\n",this->tmp1);
+                log(fmt::format("RST {}\n",this->tmp1));
                 this->cycle++;
             } else if (this->cycle == 1) {
                 this->pc += 1;
@@ -825,7 +824,7 @@ void Cpu::do_tick(Bus &bus) {
                 this->cycle++;
             } else if (this->cycle == 3) {
                 this->pc = 8*this->tmp1;
-                fmt::print("\t\t\t\t\t\t\t\t\t Calling subroutine at: ${:04X}\n", this->pc);
+                log(fmt::format("\t\t\t\t\t\t\t\t\t Calling subroutine at: ${:04X}\n", this->pc));
                 this->cycle = 0;
             }
             break;
@@ -835,7 +834,7 @@ void Cpu::do_tick(Bus &bus) {
         // Return
         case 0xC9:
             if(this->cycle == 0) {
-                fmt::print("RET\n");
+                log(fmt::format("RET\n"));
                 this->cycle++;
             } else if (this->cycle == 1) {
                 this->tmp1 = bus.read(this->sp);
@@ -847,7 +846,7 @@ void Cpu::do_tick(Bus &bus) {
                 this->cycle++;
             } else if (this->cycle == 3) {
                 this->pc = (static_cast<uint16_t>(this->tmp2) << 8) | static_cast<uint16_t>(this->tmp1);
-                fmt::print("\t\t\t\t\t\t\t\t\t Returning from subroutine\n", this->pc);
+                log(fmt::format("\t\t\t\t\t\t\t\t\t Returning from subroutine\n", this->pc));
                 this->cycle = 0;
             }
             break;
@@ -857,16 +856,16 @@ void Cpu::do_tick(Bus &bus) {
         //-------------------------------------------------------
         case 0xF3:
             // single cycle
-            fmt::print("DI\n");
+            log(fmt::format("DI\n"));
             this->ime = false;
-            fmt::print("\t\t\t\t\t\t\t\t\t Maskable interrupts disabled\n");
+            log(fmt::format("\t\t\t\t\t\t\t\t\t Maskable interrupts disabled\n"));
             this->pc++;
             break;
         case 0xFB:
             // single cycle
-            fmt::print("EI\n");
+            log(fmt::format("EI\n"));
             this->ime = true;
-            fmt::print("\t\t\t\t\t\t\t\t\t Maskable interrupts enabled\n");
+            log(fmt::format("\t\t\t\t\t\t\t\t\t Maskable interrupts enabled\n"));
             this->pc++;
             break;
 
@@ -875,14 +874,14 @@ void Cpu::do_tick(Bus &bus) {
         //-------------------------------------------------------
         case 0xCB:
             if (this->cycle == 0) {
-                fmt::print("16-bit instruction\n");
+                log(fmt::format("16-bit instruction\n"));
                 this->cycle++;
                 return;
             }
 
             if (this->cycle == 1) {
                 this->tmp1 = bus.read(this->pc + 1);
-                fmt::print("\t\t\t\t\t\t\t\t read extended opcode: ${:02X} -> ", this->tmp1);
+                log(fmt::format("\t\t\t\t\t\t\t\t read extended opcode: ${:02X} -> ", this->tmp1));
             }
 
             switch (this->tmp1) {
@@ -895,24 +894,24 @@ void Cpu::do_tick(Bus &bus) {
             case 0x37:
                 if (this->cycle == 1) {
                     const auto reg_name = decode_reg8_name((this->opcode >> 3) & 0x7);
-                    fmt::print("SWAP {}\n", reg_name);
+                    log(fmt::format("SWAP {}\n", reg_name));
                     auto &reg = decode_reg8((this->opcode >> 3) & 0x7);
                     reg       = ((reg & 0xf) << 4) | ((reg >> 4) & 0xf);
 
-                    fmt::print("\t\t\t\t\t\t\t\t\t Swapping high and low nibbles of {} = ${:02X}\n", reg_name, reg);
+                    log(fmt::format("\t\t\t\t\t\t\t\t\t Swapping high and low nibbles of {} = ${:02X}\n", reg_name, reg));
                     this->pc += 2;
                     this->cycle = 0;
                 }
                 break;
             default:
-                fmt::print("???\n");
+                log(fmt::format("???\n"));
                 throw std::runtime_error(fmt::format("UNKNOWN EXTENDED OPCODE: ${:02X}", this->tmp1));
             }
 
             break;
 
         default:
-            fmt::print("???\n");
+            log(fmt::format("???\n"));
             throw std::runtime_error(fmt::format("UNKNOWN OPCODE: ${:02X}", this->opcode));
     }
 }
