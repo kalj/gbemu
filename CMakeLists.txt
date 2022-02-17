@@ -4,6 +4,8 @@ project(gbemu CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 
+add_compile_options(-Wall -Wpedantic -Werror)
+
 # add compiler output coloring also for ninja
 if (CMAKE_GENERATOR STREQUAL "Ninja")
   if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
