@@ -504,6 +504,36 @@ void Cpu::do_tick(Bus &bus) {
             this->pc += 1;
         } break;
 
+        case 0x90: // SUB
+        case 0x91:
+        case 0x92:
+        case 0x93:
+        case 0x94:
+        case 0x95:
+        case 0x97:
+
+        case 0x98: // SBC
+        case 0x99:
+        case 0x9a:
+        case 0x9b:
+        case 0x9c:
+        case 0x9d:
+        case 0x9f:
+        {
+            const bool with_carry = this->opcode & 0x08;
+            const auto instr_name = with_carry ? "SBC" : "SUB";
+            const auto reg_name = decode_reg8_name(this->opcode & 0x7);
+
+            log(fmt::format("{} A, {}\n", instr_name, reg_name));
+
+            const auto &reg           = decode_reg8(this->opcode & 0x7);
+            this->a() = this->get_sub(reg, with_carry);
+
+            log(fmt::format("\t\t\t\t\t\t\t\t\t A = A {} {} = ${:02X}\n", instr_name, reg_name, this->a()));
+            this->pc += 1;
+        } break;
+
+
         case 0x09: // ADD HL, r16
         case 0x19:
         case 0x29:
