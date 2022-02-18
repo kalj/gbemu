@@ -5,6 +5,9 @@
 #include <vector>
 #include <iosfwd>
 
+#define LCD_WIDTH         160
+#define LCD_HEIGHT        144
+
 class Bus;
 class InterruptState;
 

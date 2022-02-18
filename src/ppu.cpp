@@ -115,10 +115,8 @@ void Ppu::dump(std::ostream &os) const {
 }
 
 
-#define LCD_WIDTH           160
 #define N_DOTS_PER_SCANLINE 456
 
-#define LCD_HEIGHT        144
 #define N_YBLANK          10
 #define N_SCANLINES_TOTAL (LCD_HEIGHT + N_YBLANK)
 

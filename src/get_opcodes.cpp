@@ -1,5 +1,5 @@
 #include "log.h"
-#include "cpu.h"
+#include "gameboy.h"
 #include "ppu.h"
 #include "controller.h"
 #include "communication.h"

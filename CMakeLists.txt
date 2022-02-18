@@ -21,6 +21,7 @@ if(CMAKE_BUILD_TYPE STREQUAL "ASAN")
 endif()
 
 add_library(common_objects OBJECT
+  src/gameboy.cpp
   src/cpu.cpp
   src/bus.cpp
   src/controller.cpp
