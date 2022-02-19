@@ -20,9 +20,6 @@ std::string interrupt_cause_to_string(InterruptCause ic) {
 }
 
 void InterruptState::set_if_bit(InterruptCause ic) {
-    fmt::print("#######################################\n");
-    fmt::print("        Setting IF bit for {}      \n", interrupt_cause_to_string(ic));
-    fmt::print("#######################################\n");
     this->if_reg |= 1<<static_cast<uint8_t>(ic);
 }
 

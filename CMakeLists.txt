@@ -33,10 +33,19 @@ add_library(common_objects OBJECT
   src/log.cpp
   )
 
+include(FetchContent)
+FetchContent_Declare(
+  cli11
+  GIT_REPOSITORY https://github.com/CLIUtils/CLI11
+  GIT_TAG        v2.1.2
+)
+
+FetchContent_MakeAvailable(cli11)
+
 find_package(SDL2 REQUIRED)
 
 add_executable(gbemu src/gbemu.cpp)
-target_link_libraries(gbemu common_objects fmt SDL2)
+target_link_libraries(gbemu common_objects fmt SDL2 CLI11::CLI11)
 
 add_executable(get_opcodes src/get_opcodes.cpp)
 target_link_libraries(get_opcodes common_objects fmt)
