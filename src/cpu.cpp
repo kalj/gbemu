@@ -134,6 +134,29 @@ uint8_t Cpu::get_sub(uint8_t val, bool with_carry) {
     return res;
 }
 
+uint8_t Cpu::get_inc(uint8_t oldval) {
+    const uint8_t res5 = (oldval & 0xf) + 1;
+    const auto newval  = oldval + 1;
+
+    this->set_flag_h(res5 & 0x10);
+    this->set_flag_z(newval == 0);
+    this->set_flag_n(false);
+
+    return newval;
+}
+
+uint8_t Cpu::get_dec(uint8_t oldval) {
+    const uint8_t res5 = (oldval & 0xf) - 1;
+    const auto newval  = oldval - 1;
+
+    this->set_flag_h(res5 & 0x10);
+    this->set_flag_z(newval == 0);
+    this->set_flag_n(true);
+
+    return newval;
+}
+
+
 void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
 
     if(this->cycle == 0) {
@@ -698,9 +721,7 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
 
             log(fmt::format("DEC {}\n", reg_name));
 
-            reg -= 1;
-            this->set_flag_z(reg==0);
-            this->set_flag_n(true);
+            reg = this->get_dec(reg);
 
             log(fmt::format("\t\t\t\t\t\t\t\t\t {} decremented to ${:02X}\n", reg_name, reg));
 
@@ -722,14 +743,46 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
 
             log(fmt::format("INC {}\n", reg_name));
 
-            reg += 1;
-            this->set_flag_z(reg == 0);
-            this->set_flag_n(false);
+            reg = this->get_inc(reg);
 
             log(fmt::format("\t\t\t\t\t\t\t\t\t {} incremented to ${:02X}\n", reg_name, reg));
 
             this->pc += 1;
         } break;
+
+        // DEC (HL)
+        case 0x35:
+            if (this->cycle == 0) {
+                log(fmt::format("DEC (HL)\n"));
+                this->cycle++;
+            } else if (this->cycle == 1) {
+                this->tmp1 = bus.read(this->hl.r16);
+                this->cycle++;
+            } else if (this->cycle == 2) {
+                const auto newval = this->get_dec(this->tmp1);
+                bus.write(this->hl.r16, newval);
+                log(fmt::format("\t\t\t\t\t\t\t\t\t (HL) (${:04X}) decremented to ${:02X}\n", this->hl.r16, newval));
+                this->pc += 1;
+                this->cycle = 0;
+            }
+            break;
+
+        // INC (HL)
+        case 0x34:
+            if (this->cycle == 0) {
+                log(fmt::format("INC (HL)\n"));
+                this->cycle++;
+            } else if (this->cycle == 1) {
+                this->tmp1 = bus.read(this->hl.r16);
+                this->cycle++;
+            } else if (this->cycle == 2) {
+                const auto newval = this->get_inc(this->tmp1);
+                bus.write(this->hl.r16, newval);
+                log(fmt::format("\t\t\t\t\t\t\t\t\t (HL) (${:04X}) incremented to ${:02X}\n", this->hl.r16, newval));
+                this->pc += 1;
+                this->cycle = 0;
+            }
+            break;
 
         // DEC {BC,DE,HL,SP}
         case 0x0B:

@@ -88,6 +88,8 @@ private:
 
     void add(uint8_t val, bool with_carry);
     uint8_t get_sub(uint8_t val, bool with_carry);
+    uint8_t get_inc(uint8_t oldval);
+    uint8_t get_dec(uint8_t oldval);
 
     // registers
     reg af{0};
