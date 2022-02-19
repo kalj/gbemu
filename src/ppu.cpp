@@ -162,7 +162,7 @@ void Ppu::do_tick(std::vector<uint32_t> &buf, const Bus &bus, InterruptState &in
     if(ly == LCD_HEIGHT && this->lx==0) { // mode 1 if just entered Y blank region
         this->mode = 1;
         // set VBLANK interrupt
-        int_state.set_if_vblank();
+        int_state.set_if_bit(InterruptCause::VBLANK);
     }
 
     // check if ly == lyc, set in stat
@@ -174,7 +174,7 @@ void Ppu::do_tick(std::vector<uint32_t> &buf, const Bus &bus, InterruptState &in
 
     if(stat_interrupt_line && !this->prev_stat_interrupt_line) {
         // set the STAT interrupt
-        int_state.set_if_stat();
+        int_state.set_if_bit(InterruptCause::LCD_STAT);
     }
     this->prev_stat_interrupt_line = stat_interrupt_line;
 

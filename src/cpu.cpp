@@ -1,5 +1,6 @@
 #include "cpu.h"
 
+#include "interrupt_state.h"
 #include "log.h"
 #include "bus.h"
 
@@ -133,20 +134,50 @@ uint8_t Cpu::get_sub(uint8_t val, bool with_carry) {
     return res;
 }
 
-void Cpu::do_tick(Bus &bus) {
+void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
 
     if(this->cycle == 0) {
         // check for interrupts:
-        // if (IME && (IE&IF)) {
-        //    go into interrupt
-        // * cycle 0: (check the above)
-        // * cycle 1: (do nothing) // clear IME, and clear the causing bit of IF
-        // * cycle 2-3: push PC
-        // * cycle 4:  set PC to $40/$48/$50/$58/$60
-        // }
+        const auto interrupts = int_state.get_interrupts();
+        if (this->ime && interrupts) {
+            this->isr_active = interrupts & (1 << 0)   ? InterruptCause::VBLANK
+                               : interrupts & (1 << 1) ? InterruptCause::LCD_STAT
+                               : interrupts & (1 << 2) ? InterruptCause::TIMER
+                               : interrupts & (1 << 3) ? InterruptCause::SERIAL
+                                                       : InterruptCause::JOYPAD; // interrupts&(1<<4)?
 
-        this->opcode = bus.read(this->pc);
-        log(fmt::format("\t\t\t\t\t\t\t\t read opcode: ${:02X} -> ", this->opcode));
+            this->cycle++;
+            log(fmt::format("\t\t\t\t\t\t\t\t Interrupt detected: {}\n", interrupt_cause_to_string(this->isr_active.value())));
+        } else {
+            this->opcode = bus.read(this->pc);
+            log(fmt::format("\t\t\t\t\t\t\t\t read opcode: ${:02X} -> ", this->opcode));
+        }
+    }
+
+    if(this->isr_active) {
+        if(this->cycle==1) {
+            this->ime = false;
+            int_state.clear_if_bit(this->isr_active.value());
+            this->cycle++;
+        } else if(this->cycle == 2) {
+            // push PC MSB
+            this->sp--;
+            bus.write(this->sp, (this->pc >> 8)&0xff);
+            this->cycle++;
+        } else if(this->cycle == 3) {
+            // push PC LSB
+            this->sp--;
+            bus.write(this->sp, this->pc&0xff);
+            this->cycle++;
+        } else if(this->cycle == 4) {
+            // set PC to $40/$48/$50/$58/$60
+            this->pc = 0x40 + 8*static_cast<uint8_t>(this->isr_active.value());
+            log(fmt::format("\t\t\t\t\t\t\t\t Jumping to interrupt handler at ${:04X}\n", this->pc));
+            this->isr_active.reset();
+            this->cycle = 0;
+        }
+
+        return;
     }
 
     switch (this->opcode) {

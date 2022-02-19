@@ -3,8 +3,11 @@
 
 #include <cstdint>
 #include <string>
+#include <optional>
 
 class Bus;
+class InterruptState;
+enum class InterruptCause;
 
 union reg {
     uint16_t r16;
@@ -16,8 +19,7 @@ union reg {
 class Cpu {
 public:
     void reset();
-    void do_tick(Bus &bus);
-
+    void do_tick(Bus &bus, InterruptState &int_state);
     void dump(std::ostream &os) const;
 
 private:
@@ -96,6 +98,7 @@ private:
     uint16_t pc{0};
     bool ime{false};
 
+    std::optional<InterruptCause> isr_active;
     int cycle{0};
     uint8_t opcode{0};
     uint8_t tmp1, tmp2; // storage between cpu cycles

@@ -2,18 +2,32 @@
 
 #include <fmt/core.h>
 
-void InterruptState::set_if_vblank() {
-    fmt::print("#######################################\n");
-    fmt::print("        Setting IF bit for VBlank      \n");
-    fmt::print("#######################################\n");
-    this->if_reg |= 0x01;
+std::string interrupt_cause_to_string(InterruptCause ic) {
+    using enum InterruptCause;
+    switch(ic) {
+    case VBLANK:
+        return "VBlank";
+    case LCD_STAT:
+        return "LCD STAT";
+    case TIMER:
+        return "Timer";
+    case SERIAL:
+        return "Serial";
+    case JOYPAD:
+        return "Joypad";
+    }
+    throw std::runtime_error("Shouldn't ever end up here!");
 }
 
-void InterruptState::set_if_stat() {
+void InterruptState::set_if_bit(InterruptCause ic) {
     fmt::print("#######################################\n");
-    fmt::print("       Setting IF bit for LCD STAT     \n");
+    fmt::print("        Setting IF bit for {}      \n", interrupt_cause_to_string(ic));
     fmt::print("#######################################\n");
-    this->if_reg |= 0x02;
+    this->if_reg |= 1<<static_cast<uint8_t>(ic);
+}
+
+void InterruptState::clear_if_bit(InterruptCause ic) {
+    this->if_reg &= ~(1<<static_cast<uint8_t>(ic));
 }
 
 uint8_t InterruptState::read_reg(uint8_t regid) const {

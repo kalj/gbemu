@@ -22,7 +22,7 @@ bool test_valid_rom(const std::vector<uint8_t> &rom) {
 
     try {
         for(size_t i=0; i<rom.size(); i++) {
-            cpu.do_tick(bus);
+            cpu.do_tick(bus, int_state);
         }
         return true;
     } catch(...) {

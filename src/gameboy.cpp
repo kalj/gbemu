@@ -145,7 +145,7 @@ void Gameboy::reset() {
 }
 
 void Gameboy::do_tick() {
-    this->cpu.do_tick(this->bus);
+    this->cpu.do_tick(this->bus, this->interrupt_state);
 
     for(int j=0; j<4; j++) {
         // fmt::print(" === [PPU cycle = {}]\n", 4*i+j);

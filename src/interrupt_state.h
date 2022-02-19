@@ -4,10 +4,24 @@
 #include <cstdint>
 #include <iosfwd>
 
+enum class InterruptCause {
+    VBLANK   = 0,
+    LCD_STAT = 1,
+    TIMER    = 2,
+    SERIAL   = 3,
+    JOYPAD   = 4,
+};
+
+std::string interrupt_cause_to_string(InterruptCause ic);
+
 class InterruptState {
 public:
-    void set_if_vblank();
-    void set_if_stat();
+    void set_if_bit(InterruptCause ic);
+    void clear_if_bit(InterruptCause ic);
+
+    uint8_t get_interrupts() const {
+        return ie_reg & if_reg;
+    }
 
     uint8_t read_reg(uint8_t regid) const;
     void write_reg(uint8_t regid, uint8_t data);
