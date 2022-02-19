@@ -2,18 +2,21 @@
 #define PPU_H
 
 #include <cstdint>
-#include <vector>
 #include <iosfwd>
+#include <vector>
 
-#define LCD_WIDTH         160
-#define LCD_HEIGHT        144
+#define LCD_WIDTH  160
+#define LCD_HEIGHT 144
+
+#define OAM_SIZE 160
 
 class Bus;
 class InterruptState;
 
 class Ppu {
 public:
-    Ppu() : oam(160, 0) {}
+    Ppu() : oam(OAM_SIZE, 0) {
+    }
 
     void do_tick(std::vector<uint32_t> &buf, const Bus &bus, InterruptState &int_state);
 
@@ -29,8 +32,8 @@ public:
 
     void dump_regs(std::ostream &os) const;
     void dump_oam(std::ostream &os) const;
-private:
 
+private:
     // register
     uint8_t lcdc{0};
     uint8_t stat{0};
@@ -51,8 +54,7 @@ private:
     // other state
     bool prev_stat_interrupt_line{false};
     unsigned int lx{~0u};
-    uint8_t      mode{2};
+    uint8_t mode{2};
 };
-
 
 #endif /* PPU_H */

@@ -522,7 +522,7 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
                 bus.write(this->sp, reg & 0xff);
                 this->cycle++;
             } else {
-                log(fmt::format("\t\t\t\t\t\t\t\t\t pushed {} from to stack: ${:04X}\n", reg_name, reg));
+                log(fmt::format("\t\t\t\t\t\t\t\t\t pushed {} onto stack: ${:04X}\n", reg_name, reg));
                 this->pc += 1;
                 this->cycle = 0;
             }

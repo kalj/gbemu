@@ -118,25 +118,19 @@ uint8_t Bus::read(uint16_t addr) const {
     } else if(addr == 0xff0f || addr == 0xffff) {
         desc = "InterruptState";
         data = this->int_state.read_reg(addr-0xff00);
-        fmt::print("        Reading from InterruptState register [${:04X}] -> ${:02X}\n", addr, data);
     } else if(addr < 0xff80) {
         desc = "IO";
         const uint8_t regid = addr-0xff00;
         if(regid == 0x00) {
             data = this->controller.read_reg();
-            fmt::print("        Reading from Controller register [${:04X}] -> ${:02X}\n", addr, data);
         } else if(regid >= 0x01 && regid <= 0x02) {
             data = this->communication.read_reg(regid);
-            fmt::print("        Reading from Communication register [${:04X}] -> ${:02X}\n", addr, data);
         } else if(regid >= 0x04 && regid <= 0x07) {
             data = this->div_timer.read_reg(regid);
-            fmt::print("        Reading from Div/Timer register [${:04X}] -> ${:02X}\n", addr, data);
         } else if(regid >= 0x10 && regid <= 0x3f) {
             data = this->sound.read_reg(regid);
-            fmt::print("        Reading from Sound register [${:04X}] -> ${:02X}\n", addr, data);
         } else if(regid >= 0x40 && regid <= 0x4b) {
             data = this->ppu.read_reg(regid);
-            fmt::print("        Reading from PPU register [${:04X}] -> ${:02X}\n", addr, data);
         } else {
             throw std::runtime_error(fmt::format("INVALID IO REGISTER READ AT ${:04X}", addr));
         }
@@ -176,25 +170,19 @@ void Bus::write(uint16_t addr, uint8_t data) {
         return;
     } else if(addr == 0xff0f || addr == 0xffff) {
         desc = "InterruptState";
-        fmt::print("        Writing to InterruptState register [${:04X}] <- ${:02X}\n", addr, data);
         this->int_state.write_reg(addr-0xff00, data);
     } else if(addr < 0xff80) {
         desc = "IO";
         const uint8_t regid = addr-0xff00;
         if(regid == 0x00) {
-            fmt::print("        Writing to Controller register [${:04X}] <- ${:02X}\n", addr, data);
             this->controller.write_reg(data);
         } else if(regid >= 0x01 && regid <= 0x02) {
-            fmt::print("        Writing to Communication register [${:04X}] <- ${:02X}\n", addr, data);
             this->communication.write_reg(regid, data);
         } else if(regid >= 0x04 && regid <= 0x07) {
-            fmt::print("        Writing to Div/Timer register [${:04X}] <- ${:02X}\n", addr, data);
             this->div_timer.write_reg(regid, data);
         } else if(regid >= 0x10 && regid <= 0x3f) {
-            fmt::print("        Writing to Sound register [${:04X}] <- ${:02X}\n", addr, data);
             this->sound.write_reg(regid, data);
         } else if(regid >= 0x40 && regid <= 0x4b) {
-            fmt::print("        Writing to PPU register [${:04X}] <- ${:02X}\n", addr, data);
             this->ppu.write_reg(regid, data);
         } else {
             log(fmt::format("=====================================================================\n"));
