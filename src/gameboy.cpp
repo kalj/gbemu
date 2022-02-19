@@ -51,8 +51,7 @@ Gameboy::Gameboy(std::vector<uint8_t> &rom_contents)
       bus(cartridge_type, rom, cartridge_ram_size,
           controller, communication, div_timer, sound, ppu, interrupt_state),
       pixel_buffer(LCD_WIDTH*LCD_HEIGHT)
-{
-}
+{}
 
 void Gameboy::print_header() const {
 

@@ -262,5 +262,6 @@ void Bus::dump(std::ostream &os) const {
         os << fmt::format(" {:02X}", this->hram[i]);
     }
 
+    os << "\nInterruptState:\n";
     this->int_state.dump(os);
 }
