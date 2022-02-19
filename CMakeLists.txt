@@ -33,8 +33,10 @@ add_library(common_objects OBJECT
   src/log.cpp
   )
 
+find_package(SDL2 REQUIRED)
+
 add_executable(gbemu src/gbemu.cpp)
-target_link_libraries(gbemu common_objects fmt)
+target_link_libraries(gbemu common_objects fmt SDL2)
 
 add_executable(get_opcodes src/get_opcodes.cpp)
 target_link_libraries(get_opcodes common_objects fmt)
