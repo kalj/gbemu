@@ -1075,6 +1075,26 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
             }
             break;
 
+        case 0xD9:
+            if(this->cycle == 0) {
+                log(fmt::format("RETI\n"));
+                this->cycle++;
+            } else if (this->cycle == 1) {
+                this->tmp1 = bus.read(this->sp);
+                this->sp++;
+                this->cycle++;
+            } else if (this->cycle == 2) {
+                this->tmp2 = bus.read(this->sp);
+                this->sp++;
+                this->cycle++;
+            } else if (this->cycle == 3) {
+                this->ime = true;
+                this->pc = (static_cast<uint16_t>(this->tmp2) << 8) | static_cast<uint16_t>(this->tmp1);
+                log(fmt::format("\t\t\t\t\t\t\t\t\t Returning from interrupt handler (interrupts reenabled)\n"));
+                this->cycle = 0;
+            }
+            break;
+
 
         //-------------------------------------------------------
         // Interrupt stuff
