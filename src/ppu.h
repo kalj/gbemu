@@ -20,6 +20,9 @@ public:
 
     void do_tick(std::vector<uint32_t> &buf, const Bus &bus, InterruptState &int_state);
 
+    bool dma_is_active() const;
+    void tick_dma(Bus &bus);
+
     uint8_t read_reg(uint8_t regid) const;
     void write_reg(uint8_t regid, uint8_t data);
 
@@ -51,7 +54,11 @@ private:
     // oam
     std::vector<uint8_t> oam;
 
-    // other state
+    // dma state
+    uint16_t dma_src_base;
+    uint8_t dma_n_bytes_left{0};
+
+    // other rendering state
     bool prev_stat_interrupt_line{false};
     unsigned int lx{~0u};
     uint8_t mode{2};

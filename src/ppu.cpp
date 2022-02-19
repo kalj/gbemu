@@ -1,26 +1,23 @@
 #include "ppu.h"
 
-#include "log.h"
 #include "bus.h"
 #include "interrupt_state.h"
+#include "log.h"
 
 #include <fmt/core.h>
 #include <stdexcept>
 
-#define REG_DMA 0xFF46
-
-#define REG_LCDC 0xFF40 // LCDC: LCD Control                     (PPU RO)
-#define REG_STAT 0xFF41 // STAT: LCD Status                      (Bits 0-2 RW, 3-6 RO)
-#define REG_SCY  0xFF42 // SCY: Scroll Y                         (PPU RO)
-#define REG_SCX  0xFF43 // SCX: Scroll X                         (PPU RO)
-#define REG_LY   0xFF44 // LY: LCD Y Coordinate                  (PPU RW)
-#define REG_LYC  0xFF45 // LYC: LY Compare                       (PPU RO)
-#define REG_BGP  0xFF47 // BGP:  BG Palette Data    (Non CGB)    (PPU RO)
-#define REG_OBP0 0xFF48 // OBP0: Obj Palette 0 Data (Non CGB)    (PPU RO)
-#define REG_OBP1 0xFF49 // OBP1: Obj Palette 1 Data (Non CGB)    (PPU RO)
-#define REG_WY   0xFF4A // WY: Window Y Position                 (PPU RO)
-#define REG_WX   0xFF4B // WX: Window X Position + 7             (PPU RO)
-
+// LCDC: LCD Control                     (PPU RO)
+// STAT: LCD Status                      (Bits 0-2 RW, 3-6 RO)
+// SCY: Scroll Y                         (PPU RO)
+// SCX: Scroll X                         (PPU RO)
+// LY: LCD Y Coordinate                  (PPU RW)
+// LYC: LY Compare                       (PPU RO)
+// BGP:  BG Palette Data    (Non CGB)    (PPU RO)
+// OBP0: Obj Palette 0 Data (Non CGB)    (PPU RO)
+// OBP1: Obj Palette 1 Data (Non CGB)    (PPU RO)
+// WY: Window Y Position                 (PPU RO)
+// WX: Window X Position + 7             (PPU RO)
 
 #define LCDC_BG_WIN_ENABLE     0b00000001
 #define LCDC_OBJ_ENABLE        0b00000010
@@ -30,6 +27,11 @@
 #define LCDC_WIN_ENABLE        0b00100000
 #define LCDC_WIN_TMAP_AREA     0b01000000
 #define LCDC_LCD_ENABLE        0b10000000
+
+#define N_DOTS_PER_SCANLINE 456
+
+#define N_YBLANK          10
+#define N_SCANLINES_TOTAL (LCD_HEIGHT + N_YBLANK)
 
 uint8_t Ppu::read_reg(uint8_t regid) const {
     switch (regid) {
@@ -59,8 +61,8 @@ uint8_t Ppu::read_reg(uint8_t regid) const {
         default:
             throw std::runtime_error(fmt::format("Invalid regid passed to Ppu: {}", regid));
     }
-
 }
+
 void Ppu::write_reg(uint8_t regid, uint8_t data) {
     switch (regid) {
         case 0x40:
@@ -78,6 +80,12 @@ void Ppu::write_reg(uint8_t regid, uint8_t data) {
         // case 0x44: prohibited to write to LY!
         case 0x45:
             this->lyc = data;
+            break;
+
+        case 0x46:
+            this->dma_src_base = static_cast<uint16_t>(data) << 8;
+            log(fmt::format("Starting DMA from ${:04X}\n", this->dma_src_base));
+            this->dma_n_bytes_left = OAM_SIZE;
             break;
 
         case 0x47:
@@ -99,6 +107,7 @@ void Ppu::write_reg(uint8_t regid, uint8_t data) {
             throw std::runtime_error(fmt::format("Invalid regid passed to Ppu: {}", regid));
     }
 }
+
 void Ppu::dump_regs(std::ostream &os) const {
     os << fmt::format("LCDC [0xFF40] {:02X}\n", this->lcdc);
     os << fmt::format("STAT [0xFF41] {:02X}\n", this->stat);
@@ -115,9 +124,9 @@ void Ppu::dump_regs(std::ostream &os) const {
 }
 
 void Ppu::dump_oam(std::ostream &os) const {
-    for(uint16_t i=0; i<this->oam.size(); i++) {
-        const uint16_t a = i+0xfe00;
-        if(a%16 == 0) {
+    for (uint16_t i = 0; i < this->oam.size(); i++) {
+        const uint16_t a = i + 0xfe00;
+        if (a % 16 == 0) {
             os << fmt::format("\n${:04X}:", a);
         }
 
@@ -125,10 +134,21 @@ void Ppu::dump_oam(std::ostream &os) const {
     }
 }
 
-#define N_DOTS_PER_SCANLINE 456
+bool Ppu::dma_is_active() const {
+    return this->dma_n_bytes_left != 0;
+}
 
-#define N_YBLANK          10
-#define N_SCANLINES_TOTAL (LCD_HEIGHT + N_YBLANK)
+void Ppu::tick_dma(Bus &bus) {
+    if (this->dma_n_bytes_left == 0) {
+        return;
+    }
+    // copy from high to low address...
+    this->dma_n_bytes_left--;
+    log(fmt::format("\t\t\t\t\t\t\t\t Performing DMA transfer from ${:04X} to OAM at ${:04X}\n",
+                    this->dma_src_base + this->dma_n_bytes_left,
+                    this->dma_n_bytes_left + 0xfe00));
+    this->oam[this->dma_n_bytes_left] = bus.read(this->dma_src_base + this->dma_n_bytes_left);
+}
 
 // H: 144: 154 scanlines  (coord : index LY ( FF44))
 // W: 160: 456 dots per scanline -> 70224 dots -> 4 MiHz / 70224 = 59.727 5Hz

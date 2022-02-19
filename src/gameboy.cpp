@@ -145,6 +145,10 @@ void Gameboy::reset() {
 }
 
 void Gameboy::do_tick() {
+    if(this->ppu.dma_is_active()) {
+        this->ppu.tick_dma(bus);
+    }
+
     this->cpu.do_tick(this->bus, this->interrupt_state);
 
     for(int j=0; j<4; j++) {
