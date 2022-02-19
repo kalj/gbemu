@@ -85,7 +85,6 @@ Bus::Bus(CartridgeType type,
       vram(8 * 1024, 0xff),
       cram(ram_size, 0xff),
       wram(8 * 1024, 0xff),
-      oam(160, 0),
       hram(127, 0xff),
       controller(cntl),
       communication(comm),
@@ -113,7 +112,7 @@ uint8_t Bus::read(uint16_t addr) const {
         data = this->wram[addr-0xe000];
     } else if(addr < 0xfea0) {
         desc = "OAM";
-        data = this->oam[addr-0xfe00];
+        data = this->ppu.read_oam(addr-0xfe00);
     } else if(addr < 0xff00) {
         throw std::runtime_error(fmt::format("INVALID BUS READ AT ${:04X} (prohibited area)", addr));
     } else if(addr == 0xff0f || addr == 0xffff) {
@@ -169,7 +168,7 @@ void Bus::write(uint16_t addr, uint8_t data) {
         this->wram[addr-0xe000] = data;
     } else if(addr < 0xfea0) {
         desc = "OAM";
-        this->oam[addr-0xfe00] = data;
+        this->ppu.write_oam(addr-0xfe00,data);
     } else if(addr < 0xff00) {
         log(fmt::format("=====================================================================\n"));
         log(fmt::format("   WARNING: INVALID BUS WRITE AT ${:04X} (prohibited area), data=${:02X}\n", addr, data));
@@ -244,21 +243,14 @@ void Bus::dump(std::ostream &os) const {
     }
 
     os << "\nOAM:";
-    for(uint16_t i=0; i<this->oam.size(); i++) {
-        const uint16_t a = i+0xfe00;
-        if(a%16 == 0) {
-            os << fmt::format("\n${:04X}:", a);
-        }
-
-        os << fmt::format(" {:02X}", this->oam[i]);
-    }
+    this->ppu.dump_oam(os);
 
     os << "\nIO:\n";
     this->controller.dump(os);
     this->communication.dump(os);
     this->div_timer.dump(os);
     this->sound.dump(os);
-    this->ppu.dump(os);
+    this->ppu.dump_regs(os);
 
     os << "\nHRAM:";
     for(uint16_t i=0; i<this->hram.size(); i++) {

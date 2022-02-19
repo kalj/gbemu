@@ -99,7 +99,7 @@ void Ppu::write_reg(uint8_t regid, uint8_t data) {
             throw std::runtime_error(fmt::format("Invalid regid passed to Ppu: {}", regid));
     }
 }
-void Ppu::dump(std::ostream &os) const {
+void Ppu::dump_regs(std::ostream &os) const {
     os << fmt::format("LCDC [0xFF40] {:02X}\n", this->lcdc);
     os << fmt::format("STAT [0xFF41] {:02X}\n", this->stat);
     os << fmt::format("SCY  [0xFF42] {:02X}\n", this->scy);
@@ -114,6 +114,16 @@ void Ppu::dump(std::ostream &os) const {
     os << fmt::format("WX   [0xFF4B] {:02X}\n", this->wx);
 }
 
+void Ppu::dump_oam(std::ostream &os) const {
+    for(uint16_t i=0; i<this->oam.size(); i++) {
+        const uint16_t a = i+0xfe00;
+        if(a%16 == 0) {
+            os << fmt::format("\n${:04X}:", a);
+        }
+
+        os << fmt::format(" {:02X}", this->oam[i]);
+    }
+}
 
 #define N_DOTS_PER_SCANLINE 456
 
@@ -125,7 +135,7 @@ void Ppu::dump(std::ostream &os) const {
 
 //  Mode cycle: 22 333 00  22 333 00 .. 111111
 
-void Ppu::do_tick(std::vector<uint32_t> &buf, Bus &bus, InterruptState &int_state) {
+void Ppu::do_tick(std::vector<uint32_t> &buf, const Bus &bus, InterruptState &int_state) {
 
     if((this->lcdc & LCDC_LCD_ENABLE) == 0) {
         // lcd / ppu disabled
@@ -179,9 +189,79 @@ void Ppu::do_tick(std::vector<uint32_t> &buf, Bus &bus, InterruptState &int_stat
         // selected_sprites
     } else if(this->mode == 3) {
 
-        // do the drawing
+        if(this->lx == 90) {
+            // int8_t object_indices[10];
+            // int n_object_indices=0;
+            // // foreach object in oam, gather (up to) 10 relevant ones
+            // const auto tile_height = this->lcdc&(1<<2) ? 16 : 8;
+            // for(int i=0; i<40; i++) {
+            //     const auto ypos = this->oam[4*i];
 
-        // at some point switch to mode 0
+            //     if(this->ly+16 >= ypos && this->ly+16 < ypos+tile_height) {
+            //         object_indices[n_object_indices++] = i;
+            //     }
+            // }
+
+            // background tilemap coordinate
+            // background tile index
+            const uint8_t bgy = this->scx + this->ly; // wrapping ok
+            const uint8_t bg_tm_iy = bgy / 8; // 0-31
+            const uint8_t bg_td_iy = bgy % 8; // 0-7
+
+            // do the drawing
+            for(int i=0; i<LCD_WIDTH; i++) {
+                // for this pixel, check background tiles, window tiles, and each of the potential objects/sprites.
+                // set this pixel to the value based on the above
+
+                uint8_t value = 0xff;
+
+                if(this->lcdc&0x01) { // background / window enabled
+                    // coordinate within the background tile map:
+                    uint8_t bgx = this->scx + i; // wrapping ok
+                    const uint8_t bg_tm_ix = bgx / 8; // 0-31
+                    const uint8_t bg_td_ix = bgx % 8; // 0-7
+
+                    const uint16_t tile_map_area_base_idx = (this->lcdc&(1<<3))?0x9c00 : 0x9800;
+                    uint8_t tile_idx = bus.read(tile_map_area_base_idx + 32 * bg_tm_iy + bg_tm_ix);
+                    uint16_t tile_data_area_base_idx = 0x8000;
+                    if((this->lcdc & (1 << 4)) == 0) {
+                        tile_idx -= 128;
+                        tile_data_area_base_idx = 0x8800;
+                    }
+
+                    const uint8_t tile_row_lsb = (bus.read(tile_data_area_base_idx*16 + 2*bg_td_iy)>>(7-bg_td_ix))&0x1;
+                    const uint8_t tile_row_msb = (bus.read(tile_data_area_base_idx*16 + 2*bg_td_iy+1)>>(7-bg_td_ix))&0x1;
+                    const uint8_t color_id = (tile_row_msb<<1)|tile_row_lsb;
+
+                    value = 255-(((this->bgp>>color_id)&0x3) << 6); // 0-3 -> 0-192 -> 192-0
+
+                    // if(this->lcdc&(1<<5)) { // window enabled
+                    // }
+                }
+
+                // if(this->lcdc&(1<<1)) { // object/sprite enabled
+                //     int8_t object_index = -1;
+                //     for(int i=0; i<n_object_indices; i++) {
+                //         const auto xpos = this->oam[4*object_indices[i] + 1];
+                //         if(this->lx+8 >= xpos && this->lx < xpos) {
+
+                //             object_index = 0;
+                //             break;
+                //         }
+
+
+
+                // }
+
+                buf[LCD_WIDTH*this->ly + i] = value<<24 | value<<16 | value<<8 | 0xff;
+            }
+        }
+
+        if(this->lx == 250) {
+            // at some point switch to mode 0
+            this->mode = 0;
+        }
+
     } else if(this->mode == 0) {
         // do nothing ?
     }
