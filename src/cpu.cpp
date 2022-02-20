@@ -1130,26 +1130,41 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
                 log(fmt::format("\t\t\t\t\t\t\t\t read extended opcode: ${:02X} -> ", this->tmp1));
             }
 
-            switch (this->tmp1) {
-            case 0x30:
-            case 0x31:
-            case 0x32:
-            case 0x33:
-            case 0x34:
-            case 0x35:
-            case 0x37:
-                if (this->cycle == 1) {
-                    const auto reg_name = decode_reg8_name((this->opcode >> 3) & 0x7);
-                    log(fmt::format("SWAP {}\n", reg_name));
-                    auto &reg = decode_reg8((this->opcode >> 3) & 0x7);
-                    reg       = ((reg & 0xf) << 4) | ((reg >> 4) & 0xf);
+            if((this->tmp1&0b00111000)==0b00110000) { // SWAP
+                if(this->tmp1==0x36) { // SWAP (HL)
+                    log(fmt::format("???\n"));
+                    throw std::runtime_error(fmt::format("UNKNOWN EXTENDED OPCODE ${:02X} at PC=${:04X}", this->tmp1, this->pc));
+                } else {
+                    if (this->cycle == 1) {
+                        const auto reg_name = decode_reg8_name(this->tmp1 & 0x7);
+                        log(fmt::format("SWAP {}\n", reg_name));
+                        auto &reg = decode_reg8(this->tmp1 & 0x7);
+                        reg       = ((reg & 0xf) << 4) | ((reg >> 4) & 0xf);
 
-                    log(fmt::format("\t\t\t\t\t\t\t\t\t Swapping high and low nibbles of {} = ${:02X}\n", reg_name, reg));
-                    this->pc += 2;
-                    this->cycle = 0;
+                        log(fmt::format("\t\t\t\t\t\t\t\t\t Swapping high and low nibbles of {} = ${:02X}\n", reg_name, reg));
+                        this->pc += 2;
+                        this->cycle = 0;
+                    }
                 }
-                break;
-            default:
+            } else if((this->tmp1&0b11000000)==0b10000000) { // RES <bit>, r
+                if((this->tmp1&0b00000111)==0b110) { // RES <bit>, (HL)
+                    log(fmt::format("???\n"));
+                    throw std::runtime_error(fmt::format("UNKNOWN EXTENDED OPCODE ${:02X} at PC=${:04X}", this->tmp1, this->pc));
+                } else {
+                    if (this->cycle == 1) {
+                        const auto reg_name = decode_reg8_name(this->tmp1 & 0x7);
+                        const auto bit = (this->tmp1 >> 3) & 0x7;
+
+                        log(fmt::format("RES {}, {}\n", bit, reg_name));
+                        auto &reg = decode_reg8(this->tmp1 & 0x7);
+                        reg       &= ~(1<<bit);
+
+                        log(fmt::format("\t\t\t\t\t\t\t\t\t Resetting bit {} of register {} = ${:02X}\n", bit, reg_name, reg));
+                        this->pc += 2;
+                        this->cycle = 0;
+                    }
+                }
+            } else {
                 log(fmt::format("???\n"));
                 throw std::runtime_error(fmt::format("UNKNOWN EXTENDED OPCODE ${:02X} at PC=${:04X}", this->tmp1, this->pc));
             }
