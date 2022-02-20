@@ -1164,7 +1164,7 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
                 log(fmt::format("\t\t\t\t\t\t\t\t read extended opcode: ${:02X} -> ", this->tmp1));
             }
 
-            if((this->tmp1&0b00111000)==0b00110000) { // SWAP
+            if((this->tmp1&0b11111000)==0b00110000) { // SWAP
                 if(this->tmp1==0x36) { // SWAP (HL)
                     log(fmt::format("???\n"));
                     throw std::runtime_error(fmt::format("UNKNOWN EXTENDED OPCODE ${:02X} at PC=${:04X}", this->tmp1, this->pc));
