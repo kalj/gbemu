@@ -210,17 +210,20 @@ void Ppu::do_tick(std::vector<uint32_t> &buf, const Bus &bus, InterruptState &in
     } else if(this->mode == 3) {
 
         if(this->lx == 90) {
-            // int8_t object_indices[10];
-            // int n_object_indices=0;
-            // // foreach object in oam, gather (up to) 10 relevant ones
-            // const auto tile_height = this->lcdc&(1<<2) ? 16 : 8;
-            // for(int i=0; i<40; i++) {
-            //     const auto ypos = this->oam[4*i];
+            int8_t object_indices[10];
+            int8_t object_row[10];
+            int n_object_indices=0;
+            // foreach object in oam, gather (up to) 10 relevant ones
+            const auto tile_height = this->lcdc&(1<<2) ? 16 : 8;
+            for(int i=0; i<40; i++) {
+                const auto ypos = this->oam[4*i];
 
-            //     if(this->ly+16 >= ypos && this->ly+16 < ypos+tile_height) {
-            //         object_indices[n_object_indices++] = i;
-            //     }
-            // }
+                if(this->ly+16 >= ypos && this->ly+16 < ypos+tile_height) {
+                    object_row[n_object_indices] = this->ly+16-ypos;
+                    object_indices[n_object_indices++] = i;
+                    // save y coord in tile
+                }
+            }
 
             // background tilemap coordinate
             // background tile index
@@ -233,7 +236,7 @@ void Ppu::do_tick(std::vector<uint32_t> &buf, const Bus &bus, InterruptState &in
                 // for this pixel, check background tiles, window tiles, and each of the potential objects/sprites.
                 // set this pixel to the value based on the above
 
-                uint8_t value = 0xff;
+                uint8_t value = 0;
 
                 if(this->lcdc&0x01) { // background / window enabled
                     // coordinate within the background tile map:
@@ -249,30 +252,62 @@ void Ppu::do_tick(std::vector<uint32_t> &buf, const Bus &bus, InterruptState &in
                         tile_data_area_base_idx = 0x8800;
                     }
 
-                    const uint8_t tile_row_lsb = (bus.read(tile_data_area_base_idx*16 + 2*bg_td_iy)>>(7-bg_td_ix))&0x1;
-                    const uint8_t tile_row_msb = (bus.read(tile_data_area_base_idx*16 + 2*bg_td_iy+1)>>(7-bg_td_ix))&0x1;
-                    const uint8_t color_id = (tile_row_msb<<1)|tile_row_lsb;
+                    const auto tile_row_lsb = bus.read(tile_data_area_base_idx*16 + 2*bg_td_iy);
+                    const auto tile_row_msb = bus.read(tile_data_area_base_idx*16 + 2*bg_td_iy+1);
+                    const auto color_id_lsb = (tile_row_lsb >>(7-bg_td_ix))&0x1;
+                    const auto color_id_msb = (tile_row_msb >>(7-bg_td_ix))&0x1;
+                    const uint8_t color_id = (color_id_msb<<1)|color_id_lsb;
 
-                    value = 255-(((this->bgp>>color_id)&0x3) << 6); // 0-3 -> 0-192 -> 192-0
+                    value = (this->bgp>>color_id)&0x3;
 
                     // if(this->lcdc&(1<<5)) { // window enabled
                     // }
                 }
 
-                // if(this->lcdc&(1<<1)) { // object/sprite enabled
-                //     int8_t object_index = -1;
-                //     for(int i=0; i<n_object_indices; i++) {
-                //         const auto xpos = this->oam[4*object_indices[i] + 1];
-                //         if(this->lx+8 >= xpos && this->lx < xpos) {
+                if(this->lcdc&(1<<1)) { // object/sprite enabled
+                    // loop over objects until a non-transparent pixel value has been found,
+                    // and save the object index along the way
 
-                //             object_index = 0;
-                //             break;
-                //         }
+                    // int8_t object_index = -1;
+                    for(int i=0; i<n_object_indices; i++) {
+                        const auto oi = object_indices[i];
+                        const auto xpos = this->oam[4*oi + 1];
+                        if(this->lx+8 >= xpos && this->lx < xpos) {
+                            // the sprite covers this pixel
+                            const auto tile_index = this->oam[4*oi + 2];
 
+                            // get coord in tile:
+                            const auto sprite_iy = object_row[i];
+                            const auto sprite_ix = this->lx+8-xpos;
 
+                            // TODO: adjust for flip etc
 
-                // }
+                            const auto sprite_row_lsb = bus.read(0x8000+tile_index*16 + 2*sprite_iy);
+                            const auto sprite_row_msb = bus.read(0x8000+tile_index*16 + 2*sprite_iy+1);
+                            const auto color_id_lsb = (sprite_row_lsb>>(7-sprite_ix))&0x1;
+                            const auto color_id_msb = (sprite_row_msb>>(7-sprite_ix))&0x1;
+                            const uint8_t color_id = (color_id_msb<<1)|color_id_lsb;
 
+                            if(color_id == 0) { // transparent, so skip this sprite and continue
+                                continue;
+                            }
+
+                            const auto attributes = this->oam[4*oi + 3];
+
+                            // get actual color using palette
+                            // if not transparent, assign value to `value` and break the loop
+                            // TODO: check for background on top
+
+                            if((attributes & (1<<7)) != (1<<7)) {
+                                value = ((attributes&(1<<4) ? this->obp1 : this->obp0)>>color_id)&0x3;
+                            }
+
+                            break;
+                        }
+                    }
+                }
+
+                value = 255-(value<<6); // 0-3 -> 0-192 -> 192-0
                 buf[LCD_WIDTH*this->ly + i] = value<<24 | value<<16 | value<<8 | 0xff;
             }
         }
