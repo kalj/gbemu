@@ -1151,14 +1151,14 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
                 break;
             default:
                 log(fmt::format("???\n"));
-                throw std::runtime_error(fmt::format("UNKNOWN EXTENDED OPCODE: ${:02X}", this->tmp1));
+                throw std::runtime_error(fmt::format("UNKNOWN EXTENDED OPCODE ${:02X} at PC=${:04X}", this->tmp1, this->pc));
             }
 
             break;
 
         default:
             log(fmt::format("???\n"));
-            throw std::runtime_error(fmt::format("UNKNOWN OPCODE: ${:02X}", this->opcode));
+            throw std::runtime_error(fmt::format("UNKNOWN OPCODE ${:02X} at PC=${:04X}", this->opcode, this->pc));
     }
 }
 
