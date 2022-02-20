@@ -514,13 +514,13 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
                 log(fmt::format("POP {}\n", reg_name));
                 this->cycle++;
             } else if (this->cycle == 1) {
-                this->tmp1 = bus.read(this->sp);
+                this->tmp1 = bus.read(this->sp); // LSB
                 this->sp++;
                 this->cycle++;
             } else {
-                this->tmp2 = bus.read(this->sp);
+                this->tmp2 = bus.read(this->sp); // MSB
                 this->sp++;
-                reg = static_cast<uint16_t>(this->tmp1) << 8 | this->tmp2;
+                reg = static_cast<uint16_t>(this->tmp2) << 8 | this->tmp1;
                 log(fmt::format("\t\t\t\t\t\t\t\t\t POP {} from stack: ${:04X}\n", reg_name, reg));
                 this->pc += 1;
                 this->cycle = 0;
@@ -1003,11 +1003,11 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
             } else if (this->cycle == 1) {
                 this->pc += 1;
                 this->sp--;
-                bus.write(this->sp, this->pc&0xff);
+                bus.write(this->sp, (this->pc >> 8)&0xff);
                 this->cycle++;
             } else if (this->cycle == 2) {
                 this->sp--;
-                bus.write(this->sp, (this->pc >> 8)&0xff);
+                bus.write(this->sp, this->pc&0xff);
                 this->cycle++;
             } else if (this->cycle == 3) {
                 this->pc = 8*this->tmp1;
@@ -1061,11 +1061,11 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
                     this->cycle = 0;
                 }
             } else if (this->cycle == 2) {
-                this->tmp1 = bus.read(this->sp);
+                this->tmp1 = bus.read(this->sp); // LSB
                 this->sp++;
                 this->cycle++;
             } else if (this->cycle == 3) {
-                this->tmp2 = bus.read(this->sp);
+                this->tmp2 = bus.read(this->sp); // MSB
                 this->sp++;
                 this->cycle++;
             } else if (this->cycle == 4) {
@@ -1080,11 +1080,11 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
                 log(fmt::format("RETI\n"));
                 this->cycle++;
             } else if (this->cycle == 1) {
-                this->tmp1 = bus.read(this->sp);
+                this->tmp1 = bus.read(this->sp); // LSB
                 this->sp++;
                 this->cycle++;
             } else if (this->cycle == 2) {
-                this->tmp2 = bus.read(this->sp);
+                this->tmp2 = bus.read(this->sp); // MSB
                 this->sp++;
                 this->cycle++;
             } else if (this->cycle == 3) {
