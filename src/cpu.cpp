@@ -360,6 +360,40 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
                 this->cycle = 0;
             }
             break;
+
+        case 0x02: // LD (BC), A
+        case 0x12: // LD (DE), A
+            if (this->cycle == 0) {
+                const auto reg_name = this->opcode & 0x10 ? "DE" : "BC";
+                log(fmt::format("LD ({}), A\n", reg_name));
+                this->cycle++;
+            } else if (this->cycle == 1) {
+                const auto reg_name = this->opcode & 0x10 ? "DE" : "BC";
+                const auto reg      = this->opcode & 0x10 ? this->de.r16 : this->bc.r16;
+
+                bus.write(reg, this->a());
+                log(fmt::format("\t\t\t\t\t\t\t\t\t a (${:02X}) stored to ({}) (${:04X})\n",
+                                this->a(),
+                                reg_name,
+                                reg));
+                this->pc += 1;
+                this->cycle = 0;
+            }
+            break;
+        case 0x22:
+            if (this->cycle == 0) {
+                log(fmt::format("LD (HL+), A\n"));
+                this->cycle++;
+            } else if (this->cycle == 1) {
+                bus.write(this->hl.r16, this->a());
+                log(fmt::format("\t\t\t\t\t\t\t\t\t a (${:02X}) stored to (hl) (${:04X}), and hl incremented\n",
+                                this->a(),
+                                this->hl.r16));
+                this->hl.r16++;
+                this->pc += 1;
+                this->cycle = 0;
+            }
+            break;
         case 0x32:
             if (this->cycle == 0) {
                 log(fmt::format("LD (HL-), A\n"));
