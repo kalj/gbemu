@@ -134,6 +134,17 @@ uint8_t Cpu::get_sub(uint8_t val, bool with_carry) {
     return res;
 }
 
+uint16_t Cpu::get_add16(const uint16_t r1, const uint16_t r2) {
+    const uint16_t res13 = (r1 & 0x0fff) + (r2 & 0x0fff);
+    const uint32_t res17 = static_cast<uint32_t>(r1) + r2;
+
+    this->set_flag_h(res13 & 0x1000);
+    this->set_flag_c(res17 & 0x10000);
+    this->set_flag_n(false);
+
+    return res17 & 0xffff;
+}
+
 uint8_t Cpu::get_inc(uint8_t oldval) {
     const uint8_t res5 = (oldval & 0xf) + 1;
     const uint8_t newval  = oldval + 1;
@@ -656,6 +667,29 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
             }
             break;
 
+        case 0xF8: // LD HL, SP+s8
+            if (this->cycle == 0) {
+                log(fmt::format("LD HL, SP+s8\n"));
+                this->cycle++;
+            } else if (this->cycle == 1) {
+                this->tmp1 = bus.read(this->pc + 1);
+                this->cycle++;
+            } else if (this->cycle == 2) {
+                const auto op_i8  = static_cast<int8_t>(this->tmp1);
+                const auto op_i16 = static_cast<int16_t>(op_i8);
+                const auto op_u16 = static_cast<uint16_t>(op_i16);
+                this->hl.r16      = this->get_add16(this->sp, op_u16);
+                this->set_flag_z(false);
+
+                log(fmt::format("\t\t\t\t\t\t\t\t\t HL = SP+s8 = ${:04X} {:+d} = ${:04X}\n",
+                                this->sp,
+                                op_i8,
+                                this->hl.r16));
+                this->pc += 2;
+                this->cycle = 0;
+            }
+            break;
+
         // store SP to immediate address
         case 0x08:
             if (this->cycle == 0) {
@@ -884,25 +918,47 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
         case 0x29:
         case 0x39:
             if (this->cycle == 0) {
-                const auto reg_name = decode_reg16_name((this->opcode>>4) & 0x3);
+                const auto reg_name = decode_reg16_name((this->opcode >> 4) & 0x3);
                 log(fmt::format("ADD HL, {}\n", reg_name));
                 this->cycle++;
             } else if (this->cycle == 1) {
 
-                auto &reg           = decode_reg16((this->opcode>>4) & 0x3);
-                const uint16_t res13  = (this->hl.r16&0x0fff) + (reg & 0x0fff);
-                const uint32_t res17 = static_cast<uint32_t>(this->hl.r16) + reg;
-                this->hl.r16 = res17 & 0xffff;
+                auto &reg    = decode_reg16((this->opcode >> 4) & 0x3);
+                this->hl.r16 = this->get_add16(this->hl.r16, reg);
 
-                this->set_flag_h(res13 & 0x1000);
-                this->set_flag_c(res17 & 0x10000);
-                this->set_flag_n(0);
-                const auto reg_name = decode_reg16_name((this->opcode>>4) & 0x3);
+                const auto reg_name = decode_reg16_name((this->opcode >> 4) & 0x3);
                 log(fmt::format("\t\t\t\t\t\t\t\t\t HL = HL + {} = ${:04X}\n", reg_name, this->hl.r16));
                 this->pc += 1;
                 this->cycle = 0;
             }
-        break;
+            break;
+
+        case 0xE8: // ADD SP, s8
+            if (this->cycle == 0) {
+                log(fmt::format("ADD SP,s8\n"));
+                this->cycle++;
+            } else if (this->cycle == 1) {
+                this->tmp1 = bus.read(this->pc + 1);
+                this->cycle++;
+            } else if (this->cycle == 2) {
+                // do nothing?
+                this->cycle++;
+            } else if (this->cycle == 3) {
+                const auto op_i8       = static_cast<int8_t>(this->tmp1);
+                const auto op_i16      = static_cast<int16_t>(op_i8);
+                const auto op_u16      = static_cast<uint16_t>(op_i16);
+                const auto original_sp = this->sp;
+                this->sp               = this->get_add16(this->sp, op_u16);
+                this->set_flag_z(false);
+
+                log(fmt::format("\t\t\t\t\t\t\t\t\t SP = SP+s8 = ${:04X}{:+d} = ${:04X}\n",
+                                original_sp,
+                                op_i8,
+                                this->sp));
+                this->pc += 2;
+                this->cycle = 0;
+            }
+            break;
 
         case 0xA0: // AND B
         case 0xA1: // AND C
