@@ -618,6 +618,60 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
             this->pc += 1;
         } break;
 
+        case 0x86: // ADD A, (HL)
+        case 0x8E: // ADC A, (HL)
+        case 0xC6: // ADD A, d8
+        case 0xCE: // ADC A, d8
+            if (this->cycle == 0) {
+                const bool with_carry   = this->opcode & 0x08;
+                const auto instr_name   = with_carry ? "ADC" : "ADD";
+                const auto operand_name = this->opcode & 0x40 ? "d8" : "(HL)";
+
+                log(fmt::format("{} A, {}\n", instr_name, operand_name));
+                this->cycle++;
+                this->pc++;
+            } else if (this->cycle == 1) {
+                const bool with_carry      = this->opcode & 0x08;
+                const auto instr_name      = with_carry ? "ADC" : "ADD";
+                const auto operand_address = this->opcode & 0x40 ? this->pc++ : this->hl.r16;
+                const auto operand         = bus.read(operand_address);
+                this->add(operand, with_carry);
+
+                const auto operand_str = this->opcode & 0x40
+                                             ? fmt::format("${:02X}", operand)
+                                             : fmt::format("${:02X} (@ ${:04X})", operand, operand_address);
+                log(fmt::format("\t\t\t\t\t\t\t\t\t A = A {} {} = ${:02X}\n", instr_name, operand_str, this->a()));
+                this->cycle = 0;
+            }
+            break;
+
+        case 0x96: // SUB A, (HL)
+        case 0x9E: // SBC A, (HL)
+        case 0xD6: // SUB A, d8
+        case 0xDE: // SBC A, d8
+            if (this->cycle == 0) {
+                const bool with_carry   = this->opcode & 0x08;
+                const auto instr_name   = with_carry ? "SBC" : "SUB";
+                const auto operand_name = this->opcode & 0x40 ? "d8" : "(HL)";
+
+                log(fmt::format("{} A, {}\n", instr_name, operand_name));
+                this->cycle++;
+                this->pc++;
+            } else if (this->cycle == 1) {
+                const bool with_carry      = this->opcode & 0x08;
+                const auto instr_name      = with_carry ? "SBC" : "SUB";
+                const auto operand_address = this->opcode & 0x40 ? this->pc++ : this->hl.r16;
+                const auto operand         = bus.read(operand_address);
+                this->a()                  = this->get_sub(operand, with_carry);
+
+                const auto operand_str = this->opcode & 0x40
+                                             ? fmt::format("${:02X}", operand)
+                                             : fmt::format("${:02X} (@ ${:04X})", operand, operand_address);
+                log(fmt::format("\t\t\t\t\t\t\t\t\t A = A {} {} = ${:02X}\n", instr_name, operand_str, this->a()));
+                this->cycle = 0;
+            }
+            break;
+
         case 0x90: // SUB
         case 0x91:
         case 0x92:
