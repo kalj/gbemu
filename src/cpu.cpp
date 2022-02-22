@@ -712,16 +712,6 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
         case 0xAC: // XOR H  1010 1100
         case 0xAD: // XOR L  1010 1101
         case 0xAF: // XOR A  1010 1111
-        {
-            const auto reg_name = decode_reg8_name(this->opcode & 0x7);
-            auto &reg           = decode_reg8(this->opcode & 0x7);
-
-            log(fmt::format("XOR {}\n", reg_name));
-            this->a()     ^= reg;
-            this->flags() = (this->a() == 0) ? 0x80 : 0x00;
-            log(fmt::format("\t\t\t\t\t\t\t\t\t A = A XOR {} = ${:02X}\n", reg_name, this->a()));
-            this->pc += 1;
-        } break;
 
         case 0xB0: // OR B
         case 0xB1: // OR C
@@ -731,15 +721,44 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
         case 0xB5: // OR L
         case 0xB7: // OR A
         {
+            const bool isxor    = (this->opcode & 0b00011000) == 0b00001000;
             const auto reg_name = decode_reg8_name(this->opcode & 0x7);
             auto &reg           = decode_reg8(this->opcode & 0x7);
 
-            log(fmt::format("OR {}\n", reg_name));
-            this->a()     |= reg;
+            const auto instr_name = isxor ? "XOR" : "OR";
+            log(fmt::format("{} {}\n", instr_name, reg_name));
+            this->a() = isxor ? this->a() ^ reg : this->a() | reg;
+
             this->flags() = (this->a() == 0) ? 0x80 : 0x00;
-            log(fmt::format("\t\t\t\t\t\t\t\t\t A = A OR {} = ${:02X}\n", reg_name, this->a()));
+            log(fmt::format("\t\t\t\t\t\t\t\t\t A = A {} {} = ${:02X}\n", instr_name, reg_name, this->a()));
             this->pc += 1;
         } break;
+
+        case 0xAE: // XOR A, (HL)
+        case 0xEE: // XOR A, d8
+        case 0xB6: // OR A, (HL)
+        case 0xF6: // OR A, d8
+            if (this->cycle == 0) {
+                const auto instr_name   = this->opcode & 0x08 ? "XOR" : "OR";
+                const auto operand_name = this->opcode & 0x40 ? "d8" : "(HL)";
+
+                log(fmt::format("{} A, {}\n", instr_name, operand_name));
+                this->cycle++;
+                this->pc++;
+            } else if (this->cycle == 1) {
+                const auto instr_name      = this->opcode & 0x08 ? "XOR" : "OR";
+                const auto operand_address = this->opcode & 0x40 ? this->pc++ : this->hl.r16;
+                const auto operand         = bus.read(operand_address);
+                this->a()                  = this->opcode & 0x08 ? this->a() ^ operand : this->a() | operand;
+                this->flags()              = (this->a() == 0) ? 0x80 : 0x00;
+
+                const auto operand_str = this->opcode & 0x40
+                                             ? fmt::format("${:02X}", operand)
+                                             : fmt::format("${:02X} (@ ${:04X})", operand, operand_address);
+                log(fmt::format("\t\t\t\t\t\t\t\t\t A = A {} {} = ${:02X}\n", instr_name, operand_str, this->a()));
+                this->cycle = 0;
+            }
+            break;
 
         // DEC {B,C,D,E,H,L,A}
         case 0x05:
