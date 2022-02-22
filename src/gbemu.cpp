@@ -92,7 +92,7 @@ int main(int argc, char **argv) {
                 }
             }
 
-            const auto cycles_to_execute = 5000;
+            const auto cycles_to_execute = 154*456;
             for(int j=0; j<cycles_to_execute; j++,i++) {
                 // log(fmt::format(" === [CPU cycle = {}]\n", i));
                 gb.do_tick();
