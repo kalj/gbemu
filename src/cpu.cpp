@@ -485,6 +485,17 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
                 this->cycle = 0;
             }
             break;
+        case 0xF9: // LD SP, HL
+            if (this->cycle == 0) {
+                log(fmt::format("LD SP, HL\n"));
+                this->cycle++;
+            } else if (this->cycle == 1) {
+                this->sp = this->hl.r16;
+                log(fmt::format("\t\t\t\t\t\t\t\t\t SP set to HL: ${:04X}\n", this->sp));
+                this->pc++;
+                this->cycle = 0;
+            }
+            break;
 
         // store A to immediate address
         case 0xEA:
@@ -539,14 +550,14 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
                 this->cycle++;
             } else {
                 const uint16_t addr = 0xff00 | this->tmp1;
-                log(fmt::format("\t\t\t\t\t\t\t\t\t a (${:02X}) stored to (${:04X})\n", this->a(), addr));
+                log(fmt::format("\t\t\t\t\t\t\t\t\t A (${:02X}) stored to (${:04X})\n", this->a(), addr));
                 bus.write(addr, this->a());
                 this->pc += 2;
                 this->cycle = 0;
             }
             break;
         case 0xF0:
-            if(this->cycle == 0) {
+            if (this->cycle == 0) {
                 log(fmt::format("LD A, (a8)\n"));
                 this->cycle++;
             } else if (this->cycle == 1) {
@@ -554,8 +565,8 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
                 this->cycle++;
             } else {
                 const uint16_t addr = 0xff00 | this->tmp1;
-                this->a() = bus.read(addr);
-                log(fmt::format("\t\t\t\t\t\t\t\t\t a (${:02X}) read from (${:04X})\n", this->a(), addr));
+                this->a()           = bus.read(addr);
+                log(fmt::format("\t\t\t\t\t\t\t\t\t A (${:02X}) loaded from (${:04X})\n", this->a(), addr));
                 this->pc += 2;
                 this->cycle = 0;
             }
@@ -566,8 +577,20 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
                 this->cycle++;
             } else if (this->cycle == 1) {
                 const uint16_t addr = 0xff00 | this->bc.r8.lo; // (0xff00|c)
-                log(fmt::format("\t\t\t\t\t\t\t\t\t a (${:02X}) stored to (${:04X})\n", this->a(), addr));
+                log(fmt::format("\t\t\t\t\t\t\t\t\t A (${:02X}) stored to (${:04X})\n", this->a(), addr));
                 bus.write(addr, this->a());
+                this->pc += 1;
+                this->cycle = 0;
+            }
+            break;
+        case 0xF2:
+            if (this->cycle == 0) {
+                log(fmt::format("LD A, (C)\n"));
+                this->cycle++;
+            } else if (this->cycle == 1) {
+                const uint16_t addr = 0xff00 | this->bc.r8.lo; // (0xff00|c)
+                this->a()           = bus.read(addr);
+                log(fmt::format("\t\t\t\t\t\t\t\t\t A (${:02X}) loaded from (${:04X})\n", this->a(), addr));
                 this->pc += 1;
                 this->cycle = 0;
             }
