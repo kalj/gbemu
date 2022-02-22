@@ -304,6 +304,31 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
             }
         break;
 
+        case 0x70:
+        case 0x71:
+        case 0x72:
+        case 0x73:
+        case 0x74:
+        case 0x75:
+        case 0x77:
+            if (this->cycle == 0) {
+                const auto reg_name = decode_reg8_name(this->opcode & 0x7);
+                log(fmt::format("LD (HL), {}\n", reg_name));
+                this->cycle++;
+            } else {
+                const auto reg_name = decode_reg8_name(this->opcode & 0x7);
+                const auto &reg     = decode_reg8(this->opcode & 0x7);
+
+                bus.write(this->hl.r16, reg);
+                log(fmt::format("\t\t\t\t\t\t\t\t\t {} written to (HL) (${:04X}) = ${:02X}\n",
+                                reg_name,
+                                this->hl.r16,
+                                reg));
+                this->pc += 1;
+                this->cycle = 0;
+            }
+            break;
+
         case 0x06: // LD B, d8    0000 0110
         case 0x0E: // LD C, d8    0000 1110
         case 0x16: // LD D, d8    0001 0110
@@ -360,6 +385,34 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
                 this->cycle = 0;
             }
             break;
+        case 0x2A: // LD A, (HL+)
+            if (this->cycle == 0) {
+                log(fmt::format("LD A, (HL+)\n"));
+                this->cycle++;
+            } else if (this->cycle == 1) {
+                this->a() = bus.read(this->hl.r16);
+                log(fmt::format("\t\t\t\t\t\t\t\t\t a (${:02X}) read from (hl) (${:04X}), and hl incremented\n",
+                                this->a(),
+                                this->hl.r16));
+                this->hl.r16++;
+                this->pc += 1;
+                this->cycle = 0;
+            }
+            break;
+        case 0x3A: // LD A, (HL-)
+            if (this->cycle == 0) {
+                log(fmt::format("LD A, (HL-)\n"));
+                this->cycle++;
+            } else if (this->cycle == 1) {
+                this->a() = bus.read(this->hl.r16);
+                log(fmt::format("\t\t\t\t\t\t\t\t\t a (${:02X}) read from (hl) (${:04X}), and hl decremented\n",
+                                this->a(),
+                                this->hl.r16));
+                this->hl.r16--;
+                this->pc += 1;
+                this->cycle = 0;
+            }
+            break;
 
         case 0x02: // LD (BC), A
         case 0x12: // LD (DE), A
@@ -404,20 +457,6 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
                                 this->a(),
                                 this->hl.r16));
                 this->hl.r16--;
-                this->pc += 1;
-                this->cycle = 0;
-            }
-            break;
-        case 0x2A: // LD A, (HL+)
-            if (this->cycle == 0) {
-                log(fmt::format("LD A, (HL+)\n"));
-                this->cycle++;
-            } else if (this->cycle == 1) {
-                this->a() = bus.read(this->hl.r16);
-                log(fmt::format("\t\t\t\t\t\t\t\t\t a (${:02X}) read from (hl) (${:04X}), and hl incremented\n",
-                                this->a(),
-                                this->hl.r16));
-                this->hl.r16++;
                 this->pc += 1;
                 this->cycle = 0;
             }
