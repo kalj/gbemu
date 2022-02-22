@@ -739,22 +739,30 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
             auto &reg           = decode_reg8(this->opcode & 0x7);
 
             log(fmt::format("AND {}\n", reg_name));
-            this->a()     &= reg;
-            this->flags() = (this->a() == 0) ? 0x80 : 0x00;
+            this->a() &= reg;
+            this->flags() = (this->a() == 0) ? 0xA0 : 0x20;
             log(fmt::format("\t\t\t\t\t\t\t\t\t A = A AND {} = ${:02X}\n", reg_name, this->a()));
             this->pc += 1;
         } break;
 
+        case 0xA6: // AND A, (HL)
         case 0xE6: // AND A, d8
             if (this->cycle == 0) {
-                log(fmt::format("LD A, d8\n"));
+                const auto operand_name = this->opcode & 0x40 ? "d8" : "(HL)";
+
+                log(fmt::format("AND A, {}\n", operand_name));
                 this->cycle++;
+                this->pc++;
             } else if (this->cycle == 1) {
-                const auto v = bus.read(this->pc + 1);
-                this->a() &= v;
-                this->flags() = (this->a() == 0) ? 0b10100000 : 0b00100000;
-                log(fmt::format("\t\t\t\t\t\t\t\t\t A = A AND ${:02X} = ${:02X}\n", v, this->a()));
-                this->pc += 2;
+                const auto operand_address = this->opcode & 0x40 ? this->pc++ : this->hl.r16;
+                const auto operand         = bus.read(operand_address);
+                this->a() &= operand;
+                this->flags() = (this->a() == 0) ? 0xA0 : 0x20;
+
+                const auto operand_str = this->opcode & 0x40
+                                             ? fmt::format("${:02X}", operand)
+                                             : fmt::format("${:02X} (@ ${:04X})", operand, operand_address);
+                log(fmt::format("\t\t\t\t\t\t\t\t\t A = A AND {} = ${:02X}\n", operand_str, this->a()));
                 this->cycle = 0;
             }
             break;
