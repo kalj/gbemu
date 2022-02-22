@@ -1,135 +1,129 @@
 #include "cpu.h"
 
+#include "bus.h"
 #include "interrupt_state.h"
 #include "log.h"
-#include "bus.h"
 
 #include <fmt/core.h>
 
 void Cpu::reset() {
-    this->af.r8.hi = 0x01; // on GB/SGB. 0xff on GBP, 0x11 on GBC
-    this->af.r8.lo = 0xb0;
+    this->a = 0x01;        // on GB/SGB. 0xff on GBP, 0x11 on GBC
+    this->set_f(0xb0);     // 0xb0;
     this->bc.r16 = 0x0013; // on GB/SGB/GBP/GBC
     this->de.r16 = 0x00d8;
     this->hl.r16 = 0x014d;
-    this->sp    = 0xfffe;
-    this->pc    = 0x0100;
+    this->sp     = 0xfffe;
+    this->pc     = 0x0100;
 
     this->cycle = 0;
-    this->ime = false;
+    this->ime   = false;
 }
 
 uint8_t &Cpu::decode_reg8(uint8_t bits) {
-    switch(bits) {
-    case 0:
-        return this->bc.r8.hi;
-    case 1:
-        return this->bc.r8.lo;
-    case 2:
-        return this->de.r8.hi;
-    case 3:
-        return this->de.r8.lo;
-    case 4:
-        return this->hl.r8.hi;
-    case 5:
-        return this->hl.r8.lo;
-    default: // 7
-        return this->af.r8.hi;
+    switch (bits) {
+        case 0:
+            return this->bc.r8.hi;
+        case 1:
+            return this->bc.r8.lo;
+        case 2:
+            return this->de.r8.hi;
+        case 3:
+            return this->de.r8.lo;
+        case 4:
+            return this->hl.r8.hi;
+        case 5:
+            return this->hl.r8.lo;
+        default: // 7
+            return this->a;
     }
 }
 
 std::string Cpu::decode_reg8_name(uint8_t bits) const {
-    switch(bits) {
-    case 0:
-        return "B";
-    case 1:
-        return "C";
-    case 2:
-        return "D";
-    case 3:
-        return "E";
-    case 4:
-        return "H";
-    case 5:
-        return "L";
-    default: // 7
-        return "A";
+    switch (bits) {
+        case 0:
+            return "B";
+        case 1:
+            return "C";
+        case 2:
+            return "D";
+        case 3:
+            return "E";
+        case 4:
+            return "H";
+        case 5:
+            return "L";
+        default: // 7
+            return "A";
     }
 }
 
 uint16_t &Cpu::decode_reg16(uint8_t bits) {
-    switch(bits) {
-    case 0:
-        return this->bc.r16;
-    case 1:
-        return this->de.r16;
-    case 2:
-        return this->hl.r16;
-    default: // 3
-        return this->sp;
+    switch (bits) {
+        case 0:
+            return this->bc.r16;
+        case 1:
+            return this->de.r16;
+        case 2:
+            return this->hl.r16;
+        default: // 3
+            return this->sp;
     }
 }
 
 std::string Cpu::decode_reg16_name(uint8_t bits) const {
-    switch(bits) {
-    case 0:
-        return "BC";
-    case 1:
-        return "DE";
-    case 2:
-        return "HL";
-    default: // 3
-        return "SP";
+    switch (bits) {
+        case 0:
+            return "BC";
+        case 1:
+            return "DE";
+        case 2:
+            return "HL";
+        default: // 3
+            return "SP";
     }
 }
 
-uint16_t &Cpu::decode_stack_reg16(uint8_t bits) {
-    switch(bits) {
-    case 0:
-        return this->bc.r16;
-    case 1:
-        return this->de.r16;
-    case 2:
-        return this->hl.r16;
-    default: // 3
-        return this->af.r16;
+uint16_t Cpu::decode_stack_reg16_value(uint8_t bits) const {
+    switch (bits) {
+        case 0:
+            return this->bc.r16;
+        case 1:
+            return this->de.r16;
+        case 2:
+            return this->hl.r16;
+        default: // 3
+            return (static_cast<uint16_t>(this->a) << 8) | this->f();
     }
 }
 
 std::string Cpu::decode_stack_reg16_name(uint8_t bits) const {
-    switch(bits) {
-    case 0:
-        return "BC";
-    case 1:
-        return "DE";
-    case 2:
-        return "HL";
-    default: // 3
-        return "AF";
+    switch (bits) {
+        case 0:
+            return "BC";
+        case 1:
+            return "DE";
+        case 2:
+            return "HL";
+        default: // 3
+            return "AF";
     }
 }
 
 void Cpu::add(uint8_t val, bool with_carry) {
 
-    const uint8_t res5  = (this->a() & 0xf) + (val & 0xf) + (with_carry && this->get_flag_c() ? 1 : 0);
-    const uint16_t res9 = static_cast<uint16_t>(this->a()) + val + (with_carry && this->get_flag_c() ? 1 : 0);
-    this->a() = res9 & 0xff;
+    const uint8_t res5  = (this->a & 0xf) + (val & 0xf) + (with_carry && this->flag_c ? 1 : 0);
+    const uint16_t res9 = static_cast<uint16_t>(this->a) + val + (with_carry && this->flag_c ? 1 : 0);
+    this->a             = res9 & 0xff;
 
-    this->set_flag_h(res5 & 0x10);
-    this->set_flag_c(res9&0x100);
-    this->set_flag_z(this->a() == 0);
-    this->set_flag_n(false);
+    this->set_flags(this->a == 0, false, res5 & 0x10, res9 & 0x100);
 }
 
 uint8_t Cpu::get_sub(uint8_t val, bool with_carry) {
-    const uint8_t res5 = (this->a()&0xf) - (val&0xf) -(with_carry&&this->get_flag_c()?1:0);
-    const uint16_t res9 = static_cast<uint16_t>(this->a()) - val -(with_carry&&this->get_flag_c()?1:0);
+    const uint8_t res5  = (this->a & 0xf) - (val & 0xf) - (with_carry && this->flag_c ? 1 : 0);
+    const uint16_t res9 = static_cast<uint16_t>(this->a) - val - (with_carry && this->flag_c ? 1 : 0);
 
-    const auto res = res9&0xff;
-    this->set_flag_h(res5&0x10);
-    this->set_flag_c(res9&0x100);
-    this->set_flag_n(true);
-    this->set_flag_z(res == 0);
+    const auto res = res9 & 0xff;
+    this->set_flags(res == 0, true, res5 & 0x10, res9 & 0x100);
 
     return res;
 }
@@ -138,72 +132,72 @@ uint16_t Cpu::get_add16(const uint16_t r1, const uint16_t r2) {
     const uint16_t res13 = (r1 & 0x0fff) + (r2 & 0x0fff);
     const uint32_t res17 = static_cast<uint32_t>(r1) + r2;
 
-    this->set_flag_h(res13 & 0x1000);
-    this->set_flag_c(res17 & 0x10000);
-    this->set_flag_n(false);
+    this->flag_h = res13 & 0x1000;
+    this->flag_c = res17 & 0x10000;
+    this->flag_n = false;
 
     return res17 & 0xffff;
 }
 
 uint8_t Cpu::get_inc(uint8_t oldval) {
-    const uint8_t res5 = (oldval & 0xf) + 1;
-    const uint8_t newval  = oldval + 1;
+    const uint8_t res5   = (oldval & 0xf) + 1;
+    const uint8_t newval = oldval + 1;
 
-    this->set_flag_h(res5 & 0x10);
-    this->set_flag_z(newval == 0);
-    this->set_flag_n(false);
+    this->flag_h = res5 & 0x10;
+    this->flag_n = false;
+    this->flag_z = newval == 0;
 
     return newval;
 }
 
 uint8_t Cpu::get_dec(uint8_t oldval) {
-    const uint8_t res5 = (oldval & 0xf) - 1;
-    const uint8_t newval  = oldval - 1;
+    const uint8_t res5   = (oldval & 0xf) - 1;
+    const uint8_t newval = oldval - 1;
 
-    this->set_flag_h(res5 & 0x10);
-    this->set_flag_z(newval == 0);
-    this->set_flag_n(true);
+    this->flag_h = res5 & 0x10;
+    this->flag_n = true;
+    this->flag_z = newval == 0;
 
     return newval;
 }
 
 void Cpu::rlc(uint8_t &reg, bool with_z_flag) {
-    this->set_flag_c(reg & 0x80);           // bit 7 goes into carry
-    reg = (reg << 1) | ((reg & 0x80) >> 7); // rotate left without carry
-    this->set_flag_h(false);
-    this->set_flag_n(false);
-    this->set_flag_z(with_z_flag && reg == 0);
+    this->flag_c = reg & 0x80;                       // bit 7 goes into carry
+    reg          = (reg << 1) | ((reg & 0x80) >> 7); // rotate left without carry
+    this->flag_h = false;
+    this->flag_n = false;
+    this->flag_z = with_z_flag && reg == 0;
 }
 
 void Cpu::rrc(uint8_t &reg, bool with_z_flag) {
-    this->set_flag_c(reg & 0x01);           // bit 0 goes into carry
-    reg = ((reg & 0x01) << 7) | (reg >> 1); // rotate right without carry
-    this->set_flag_z(with_z_flag && reg == 0);
-    this->set_flag_h(false);
-    this->set_flag_n(false);
+    this->flag_c = reg & 0x01;                       // bit 0 goes into carry
+    reg          = ((reg & 0x01) << 7) | (reg >> 1); // rotate right without carry
+    this->flag_z = with_z_flag && reg == 0;
+    this->flag_h = false;
+    this->flag_n = false;
 }
 
 void Cpu::rl(uint8_t &reg, bool with_z_flag) {
-    const uint8_t res = (reg << 1) | (this->get_flag_c() ? 0x01 : 0x00); // rotate left with carry.
-    this->set_flag_c(reg & 0x80);                                        // bit 7 goes into carry
-    reg = res;
-    this->set_flag_z(with_z_flag && reg == 0);
-    this->set_flag_h(false);
-    this->set_flag_n(false);
+    const uint8_t res = (reg << 1) | (this->flag_c ? 0x01 : 0x00); // rotate left with carry.
+    this->flag_c      = reg & 0x80;                                // bit 7 goes into carry
+    reg               = res;
+    this->flag_z      = with_z_flag && reg == 0;
+    this->flag_h      = false;
+    this->flag_n      = false;
 }
 
 void Cpu::rr(uint8_t &reg, bool with_z_flag) {
-    const uint8_t res = (this->get_flag_c() ? 0x80 : 0x00) | (reg >> 1); // rotate right with carry;
-    this->set_flag_c(reg & 0x01);                                        // bit 0 goes into carry
-    reg = res;
-    this->set_flag_z(with_z_flag && reg == 0);
-    this->set_flag_h(false);
-    this->set_flag_n(false);
+    const uint8_t res = (this->flag_c ? 0x80 : 0x00) | (reg >> 1); // rotate right with carry;
+    this->flag_c      = reg & 0x01;                                // bit 0 goes into carry
+    reg               = res;
+    this->flag_z      = with_z_flag && reg == 0;
+    this->flag_h      = false;
+    this->flag_n      = false;
 }
 
 void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
 
-    if(this->cycle == 0) {
+    if (this->cycle == 0) {
         // check for interrupts:
         const auto interrupts = int_state.get_interrupts();
         if (this->ime && interrupts) {
@@ -214,31 +208,32 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
                                                        : InterruptCause::JOYPAD; // interrupts&(1<<4)?
 
             this->cycle++;
-            log(fmt::format("\t\t\t\t\t\t\t\t Interrupt detected: {}\n", interrupt_cause_to_string(this->isr_active.value())));
+            log(fmt::format("\t\t\t\t\t\t\t\t Interrupt detected: {}\n",
+                            interrupt_cause_to_string(this->isr_active.value())));
         } else {
             this->opcode = bus.read(this->pc);
             log(fmt::format("\t\t\t\t\t\t\t\t read opcode: ${:02X} -> ", this->opcode));
         }
     }
 
-    if(this->isr_active) {
-        if(this->cycle==1) {
+    if (this->isr_active) {
+        if (this->cycle == 1) {
             this->ime = false;
             int_state.clear_if_bit(this->isr_active.value());
             this->cycle++;
-        } else if(this->cycle == 2) {
+        } else if (this->cycle == 2) {
             // push PC MSB
             this->sp--;
-            bus.write(this->sp, (this->pc >> 8)&0xff);
+            bus.write(this->sp, (this->pc >> 8) & 0xff);
             this->cycle++;
-        } else if(this->cycle == 3) {
+        } else if (this->cycle == 3) {
             // push PC LSB
             this->sp--;
-            bus.write(this->sp, this->pc&0xff);
+            bus.write(this->sp, this->pc & 0xff);
             this->cycle++;
-        } else if(this->cycle == 4) {
+        } else if (this->cycle == 4) {
             // set PC to $40/$48/$50/$58/$60
-            this->pc = 0x40 + 8*static_cast<uint8_t>(this->isr_active.value());
+            this->pc = 0x40 + 8 * static_cast<uint8_t>(this->isr_active.value());
             log(fmt::format("\t\t\t\t\t\t\t\t Jumping to interrupt handler at ${:04X}\n", this->pc));
             this->isr_active.reset();
             this->cycle = 0;
@@ -256,28 +251,28 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
 
         case 0x2F: { // Complement A
             log(fmt::format("CPL\n"));
-            this->a() = ~(this->a());
-            this->set_flag_h(true);
-            this->set_flag_n(true);
-            log(fmt::format("\t\t\t\t\t\t\t\t\t A = ~A = ${:02X}\n", this->a()));
+            this->a      = ~(this->a);
+            this->flag_h = true;
+            this->flag_n = true;
+            log(fmt::format("\t\t\t\t\t\t\t\t\t A = ~A = ${:02X}\n", this->a));
             this->pc += 1;
         } break;
 
         case 0x37: { // Set carry flag
             log(fmt::format("SCF\n"));
-            this->set_flag_c(true);
-            this->set_flag_h(false);
-            this->set_flag_n(false);
+            this->flag_c = true;
+            this->flag_h = false;
+            this->flag_n = false;
             log(fmt::format("\t\t\t\t\t\t\t\t\t Setting the carry flag\n"));
             this->pc++;
         } break;
 
         case 0x3F: { // Flip ("complement") carry flag
             log(fmt::format("CCF\n"));
-            this->set_flag_c(!this->get_flag_c());
-            this->set_flag_h(false);
-            this->set_flag_n(false);
-            log(fmt::format("\t\t\t\t\t\t\t\t\t Flipping the carry flag, new value: {}\n", this->get_flag_c()));
+            this->flag_c = !this->flag_c;
+            this->flag_h = false;
+            this->flag_n = false;
+            log(fmt::format("\t\t\t\t\t\t\t\t\t Flipping the carry flag, new value: {}\n", this->flag_c));
             this->pc++;
         } break;
 
@@ -341,18 +336,16 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
         case 0x7b:
         case 0x7c:
         case 0x7d:
-        case 0x7f:
-            {
-                const auto src_name = decode_reg8_name(this->opcode & 0x7);
-                const auto dst_name = decode_reg8_name((this->opcode >> 3) & 0x7);
-                const auto &src           = decode_reg8(this->opcode & 0x7);
-                auto &dst           = decode_reg8((this->opcode >> 3) & 0x7);
-                log(fmt::format("LD {}, {}\n", dst_name, src_name));
-                dst = src;
-                log(fmt::format("\t\t\t\t\t\t\t\t\t {} loaded from {} (${:02X})\n", dst_name, src_name, dst));
-                this->pc += 1;
-            }
-            break;
+        case 0x7f: {
+            const auto src_name = decode_reg8_name(this->opcode & 0x7);
+            const auto dst_name = decode_reg8_name((this->opcode >> 3) & 0x7);
+            const auto &src     = decode_reg8(this->opcode & 0x7);
+            auto &dst           = decode_reg8((this->opcode >> 3) & 0x7);
+            log(fmt::format("LD {}, {}\n", dst_name, src_name));
+            dst = src;
+            log(fmt::format("\t\t\t\t\t\t\t\t\t {} loaded from {} (${:02X})\n", dst_name, src_name, dst));
+            this->pc += 1;
+        } break;
         case 0x46:
         case 0x4E:
         case 0x56:
@@ -368,12 +361,15 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
                 const auto reg_name = decode_reg8_name((this->opcode >> 3) & 0x7);
                 auto &reg           = decode_reg8((this->opcode >> 3) & 0x7);
 
-                reg                 = bus.read(this->hl.r16);
-                log(fmt::format("\t\t\t\t\t\t\t\t\t {} loaded from (HL) (${:04X}) = ${:02X}\n", reg_name, this->hl.r16, reg));
+                reg = bus.read(this->hl.r16);
+                log(fmt::format("\t\t\t\t\t\t\t\t\t {} loaded from (HL) (${:04X}) = ${:02X}\n",
+                                reg_name,
+                                this->hl.r16,
+                                reg));
                 this->pc += 1;
                 this->cycle = 0;
             }
-        break;
+            break;
 
         case 0x70:
         case 0x71:
@@ -431,9 +427,7 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
                 this->cycle++;
             } else {
                 bus.write(this->hl.r16, this->tmp1);
-                log(fmt::format("\t\t\t\t\t\t\t\t\t ${:02X} stored to (hl) (${:04X})\n",
-                                this->tmp1,
-                                this->hl.r16));
+                log(fmt::format("\t\t\t\t\t\t\t\t\t ${:02X} stored to (hl) (${:04X})\n", this->tmp1, this->hl.r16));
 
                 this->pc += 2;
                 this->cycle = 0;
@@ -450,8 +444,8 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
 
                 const auto reg_name = this->opcode & 0x10 ? "DE" : "BC";
                 const auto reg      = this->opcode & 0x10 ? this->de.r16 : this->bc.r16;
-                this->a()           = bus.read(reg);
-                log(fmt::format("\t\t\t\t\t\t\t\t\t a (${:02X}) read from ({}) (${:04X})\n", this->a(), reg_name, reg));
+                this->a             = bus.read(reg);
+                log(fmt::format("\t\t\t\t\t\t\t\t\t a (${:02X}) read from ({}) (${:04X})\n", this->a, reg_name, reg));
                 this->pc += 1;
                 this->cycle = 0;
             }
@@ -461,9 +455,9 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
                 log(fmt::format("LD A, (HL+)\n"));
                 this->cycle++;
             } else if (this->cycle == 1) {
-                this->a() = bus.read(this->hl.r16);
+                this->a = bus.read(this->hl.r16);
                 log(fmt::format("\t\t\t\t\t\t\t\t\t a (${:02X}) read from (hl) (${:04X}), and hl incremented\n",
-                                this->a(),
+                                this->a,
                                 this->hl.r16));
                 this->hl.r16++;
                 this->pc += 1;
@@ -475,9 +469,9 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
                 log(fmt::format("LD A, (HL-)\n"));
                 this->cycle++;
             } else if (this->cycle == 1) {
-                this->a() = bus.read(this->hl.r16);
+                this->a = bus.read(this->hl.r16);
                 log(fmt::format("\t\t\t\t\t\t\t\t\t a (${:02X}) read from (hl) (${:04X}), and hl decremented\n",
-                                this->a(),
+                                this->a,
                                 this->hl.r16));
                 this->hl.r16--;
                 this->pc += 1;
@@ -495,11 +489,8 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
                 const auto reg_name = this->opcode & 0x10 ? "DE" : "BC";
                 const auto reg      = this->opcode & 0x10 ? this->de.r16 : this->bc.r16;
 
-                bus.write(reg, this->a());
-                log(fmt::format("\t\t\t\t\t\t\t\t\t a (${:02X}) stored to ({}) (${:04X})\n",
-                                this->a(),
-                                reg_name,
-                                reg));
+                bus.write(reg, this->a);
+                log(fmt::format("\t\t\t\t\t\t\t\t\t a (${:02X}) stored to ({}) (${:04X})\n", this->a, reg_name, reg));
                 this->pc += 1;
                 this->cycle = 0;
             }
@@ -509,9 +500,9 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
                 log(fmt::format("LD (HL+), A\n"));
                 this->cycle++;
             } else if (this->cycle == 1) {
-                bus.write(this->hl.r16, this->a());
+                bus.write(this->hl.r16, this->a);
                 log(fmt::format("\t\t\t\t\t\t\t\t\t a (${:02X}) stored to (hl) (${:04X}), and hl incremented\n",
-                                this->a(),
+                                this->a,
                                 this->hl.r16));
                 this->hl.r16++;
                 this->pc += 1;
@@ -523,9 +514,9 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
                 log(fmt::format("LD (HL-), A\n"));
                 this->cycle++;
             } else if (this->cycle == 1) {
-                bus.write(this->hl.r16, this->a());
+                bus.write(this->hl.r16, this->a);
                 log(fmt::format("\t\t\t\t\t\t\t\t\t a (${:02X}) stored to (hl) (${:04X}), and hl decremented\n",
-                                this->a(),
+                                this->a,
                                 this->hl.r16));
                 this->hl.r16--;
                 this->pc += 1;
@@ -539,17 +530,17 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
         case 0x21: // LD HL, d16
         case 0x31: // LD SP, d16
             if (this->cycle == 0) {
-                const auto reg_name = decode_reg16_name((this->opcode>>4)&0x3);
+                const auto reg_name = decode_reg16_name((this->opcode >> 4) & 0x3);
                 log(fmt::format("LD {}, d16\n", reg_name));
                 this->cycle++;
             } else if (this->cycle == 1) {
                 this->tmp1 = bus.read(this->pc + 1);
                 this->cycle++;
             } else if (this->cycle == 2) {
-                const auto reg_name = decode_reg16_name((this->opcode>>4)&0x3);
-                auto &reg           = decode_reg16((this->opcode>>4)&0x3);
+                const auto reg_name = decode_reg16_name((this->opcode >> 4) & 0x3);
+                auto &reg           = decode_reg16((this->opcode >> 4) & 0x3);
 
-                reg = static_cast<uint16_t>(bus.read(this->pc + 2))<<8 | this->tmp1;
+                reg = static_cast<uint16_t>(bus.read(this->pc + 2)) << 8 | this->tmp1;
 
                 log(fmt::format("\t\t\t\t\t\t\t\t\t {} set to ${:04X}\n", reg_name, reg));
                 this->pc += 3;
@@ -581,10 +572,8 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
                 this->cycle++;
             } else if (this->cycle == 3) {
                 const uint16_t addr = (static_cast<uint16_t>(this->tmp2) << 8) | static_cast<uint16_t>(this->tmp1);
-                bus.write(addr, this->a());
-                log(fmt::format("\t\t\t\t\t\t\t\t\t A (${:02X}) stored to ${:04X}\n",
-                                this->a(),
-                                addr));
+                bus.write(addr, this->a);
+                log(fmt::format("\t\t\t\t\t\t\t\t\t A (${:02X}) stored to ${:04X}\n", this->a, addr));
                 this->pc += 3;
                 this->cycle = 0;
             }
@@ -602,10 +591,8 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
                 this->cycle++;
             } else if (this->cycle == 3) {
                 const uint16_t addr = (static_cast<uint16_t>(this->tmp2) << 8) | static_cast<uint16_t>(this->tmp1);
-                this->a() = bus.read(addr);
-                log(fmt::format("\t\t\t\t\t\t\t\t\t A loaded from ${:04X} (${:02X})\n",
-                                addr,
-                                this->a()));
+                this->a             = bus.read(addr);
+                log(fmt::format("\t\t\t\t\t\t\t\t\t A loaded from ${:04X} (${:02X})\n", addr, this->a));
                 this->pc += 3;
                 this->cycle = 0;
             }
@@ -621,8 +608,8 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
                 this->cycle++;
             } else {
                 const uint16_t addr = 0xff00 | this->tmp1;
-                log(fmt::format("\t\t\t\t\t\t\t\t\t A (${:02X}) stored to (${:04X})\n", this->a(), addr));
-                bus.write(addr, this->a());
+                log(fmt::format("\t\t\t\t\t\t\t\t\t A (${:02X}) stored to (${:04X})\n", this->a, addr));
+                bus.write(addr, this->a);
                 this->pc += 2;
                 this->cycle = 0;
             }
@@ -636,8 +623,8 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
                 this->cycle++;
             } else {
                 const uint16_t addr = 0xff00 | this->tmp1;
-                this->a()           = bus.read(addr);
-                log(fmt::format("\t\t\t\t\t\t\t\t\t A (${:02X}) loaded from (${:04X})\n", this->a(), addr));
+                this->a             = bus.read(addr);
+                log(fmt::format("\t\t\t\t\t\t\t\t\t A (${:02X}) loaded from (${:04X})\n", this->a, addr));
                 this->pc += 2;
                 this->cycle = 0;
             }
@@ -648,8 +635,8 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
                 this->cycle++;
             } else if (this->cycle == 1) {
                 const uint16_t addr = 0xff00 | this->bc.r8.lo; // (0xff00|c)
-                log(fmt::format("\t\t\t\t\t\t\t\t\t A (${:02X}) stored to (${:04X})\n", this->a(), addr));
-                bus.write(addr, this->a());
+                log(fmt::format("\t\t\t\t\t\t\t\t\t A (${:02X}) stored to (${:04X})\n", this->a, addr));
+                bus.write(addr, this->a);
                 this->pc += 1;
                 this->cycle = 0;
             }
@@ -660,8 +647,8 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
                 this->cycle++;
             } else if (this->cycle == 1) {
                 const uint16_t addr = 0xff00 | this->bc.r8.lo; // (0xff00|c)
-                this->a()           = bus.read(addr);
-                log(fmt::format("\t\t\t\t\t\t\t\t\t A (${:02X}) loaded from (${:04X})\n", this->a(), addr));
+                this->a             = bus.read(addr);
+                log(fmt::format("\t\t\t\t\t\t\t\t\t A (${:02X}) loaded from (${:04X})\n", this->a, addr));
                 this->pc += 1;
                 this->cycle = 0;
             }
@@ -679,7 +666,7 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
                 const auto op_i16 = static_cast<int16_t>(op_i8);
                 const auto op_u16 = static_cast<uint16_t>(op_i16);
                 this->hl.r16      = this->get_add16(this->sp, op_u16);
-                this->set_flag_z(false);
+                this->flag_z      = false;
 
                 log(fmt::format("\t\t\t\t\t\t\t\t\t HL = SP+s8 = ${:04X} {:+d} = ${:04X}\n",
                                 this->sp,
@@ -722,8 +709,8 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
         case 0xD1:
         case 0xE1:
         case 0xF1: {
-            const auto reg_name = decode_stack_reg16_name((this->opcode >> 4) & 0x3);
-            auto &reg           = decode_stack_reg16((this->opcode >> 4) & 0x3);
+            const auto reg_id   = (this->opcode >> 4) & 0x3;
+            const auto reg_name = decode_stack_reg16_name(reg_id);
             if (this->cycle == 0) {
                 log(fmt::format("POP {}\n", reg_name));
                 this->cycle++;
@@ -734,8 +721,20 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
             } else {
                 this->tmp2 = bus.read(this->sp); // MSB
                 this->sp++;
-                reg = static_cast<uint16_t>(this->tmp2) << 8 | this->tmp1;
-                log(fmt::format("\t\t\t\t\t\t\t\t\t POP {} from stack: ${:04X}\n", reg_name, reg));
+
+                if (reg_id == 0) {
+                    this->bc.r16 = static_cast<uint16_t>(this->tmp2) << 8 | this->tmp1;
+                } else if (reg_id == 1) {
+                    this->de.r16 = static_cast<uint16_t>(this->tmp2) << 8 | this->tmp1;
+                } else if (reg_id == 2) {
+                    this->hl.r16 = static_cast<uint16_t>(this->tmp2) << 8 | this->tmp1;
+                } else if (reg_id == 3) {
+                    this->a = this->tmp2;
+                    this->set_f(this->tmp1);
+                }
+
+                const auto reg_value = decode_stack_reg16_value(reg_id);
+                log(fmt::format("\t\t\t\t\t\t\t\t\t POP {} from stack: ${:04X}\n", reg_name, reg_value));
                 this->pc += 1;
                 this->cycle = 0;
             }
@@ -746,7 +745,7 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
         case 0xE5:
         case 0xF5: {
             const auto reg_name = decode_stack_reg16_name((this->opcode >> 4) & 0x3);
-            auto &reg           = decode_stack_reg16((this->opcode >> 4) & 0x3);
+            const auto reg      = decode_stack_reg16_value((this->opcode >> 4) & 0x3);
             if (this->cycle == 0) {
                 log(fmt::format("PUSH {}\n", reg_name));
                 this->cycle++;
@@ -765,39 +764,40 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
             }
         } break;
 
-            //-------------------------------------------------------
-            // ALU
-            //-------------------------------------------------------
+        //-------------------------------------------------------
+        // ALU
+        //-------------------------------------------------------
+
         case 0x07: // RLCA
         {
             log(fmt::format("RLCA\n"));
-            this->rlc(this->a(), false);
+            this->rlc(this->a, false);
 
-            log(fmt::format("\t\t\t\t\t\t\t\t\t 8-bit rotate left of A = ${:02X}\n", this->a()));
+            log(fmt::format("\t\t\t\t\t\t\t\t\t 8-bit rotate left of A = ${:02X}\n", this->a));
             this->pc += 1;
         } break;
         case 0x0F: // RRCA
         {
             log(fmt::format("RRCA\n"));
-            this->rrc(this->a(), false);
+            this->rrc(this->a, false);
 
-            log(fmt::format("\t\t\t\t\t\t\t\t\t 8-bit rotate right of A = ${:02X}\n", this->a()));
+            log(fmt::format("\t\t\t\t\t\t\t\t\t 8-bit rotate right of A = ${:02X}\n", this->a));
             this->pc += 1;
         } break;
         case 0x17: // RLA
         {
             log(fmt::format("RLA\n"));
-            this->rl(this->a(), false);
+            this->rl(this->a, false);
 
-            log(fmt::format("\t\t\t\t\t\t\t\t\t 9-bit rotate left of A = ${:02X}\n", this->a()));
+            log(fmt::format("\t\t\t\t\t\t\t\t\t 9-bit rotate left of A = ${:02X}\n", this->a));
             this->pc += 1;
         } break;
         case 0x1F: // RRA
         {
             log(fmt::format("RRA\n"));
-            this->rr(this->a(), false);
+            this->rr(this->a, false);
 
-            log(fmt::format("\t\t\t\t\t\t\t\t\t 9-bit rotate right of A = ${:02X}\n", this->a()));
+            log(fmt::format("\t\t\t\t\t\t\t\t\t 9-bit rotate right of A = ${:02X}\n", this->a));
             this->pc += 1;
         } break;
 
@@ -815,18 +815,17 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
         case 0x8b:
         case 0x8c:
         case 0x8d:
-        case 0x8f:
-        {
+        case 0x8f: {
             const bool with_carry = this->opcode & 0x08;
             const auto instr_name = with_carry ? "ADC" : "ADD";
-            const auto reg_name = decode_reg8_name(this->opcode & 0x7);
+            const auto reg_name   = decode_reg8_name(this->opcode & 0x7);
 
             log(fmt::format("{} A, {}\n", instr_name, reg_name));
 
-            const auto &reg           = decode_reg8(this->opcode & 0x7);
+            const auto &reg = decode_reg8(this->opcode & 0x7);
             this->add(reg, with_carry);
 
-            log(fmt::format("\t\t\t\t\t\t\t\t\t A = A {} {} = ${:02X}\n", instr_name, reg_name, this->a()));
+            log(fmt::format("\t\t\t\t\t\t\t\t\t A = A {} {} = ${:02X}\n", instr_name, reg_name, this->a));
             this->pc += 1;
         } break;
 
@@ -852,7 +851,7 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
                 const auto operand_str = this->opcode & 0x40
                                              ? fmt::format("${:02X}", operand)
                                              : fmt::format("${:02X} (@ ${:04X})", operand, operand_address);
-                log(fmt::format("\t\t\t\t\t\t\t\t\t A = A {} {} = ${:02X}\n", instr_name, operand_str, this->a()));
+                log(fmt::format("\t\t\t\t\t\t\t\t\t A = A {} {} = ${:02X}\n", instr_name, operand_str, this->a));
                 this->cycle = 0;
             }
             break;
@@ -874,12 +873,12 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
                 const auto instr_name      = with_carry ? "SBC" : "SUB";
                 const auto operand_address = this->opcode & 0x40 ? this->pc++ : this->hl.r16;
                 const auto operand         = bus.read(operand_address);
-                this->a()                  = this->get_sub(operand, with_carry);
+                this->a                    = this->get_sub(operand, with_carry);
 
                 const auto operand_str = this->opcode & 0x40
                                              ? fmt::format("${:02X}", operand)
                                              : fmt::format("${:02X} (@ ${:04X})", operand, operand_address);
-                log(fmt::format("\t\t\t\t\t\t\t\t\t A = A {} {} = ${:02X}\n", instr_name, operand_str, this->a()));
+                log(fmt::format("\t\t\t\t\t\t\t\t\t A = A {} {} = ${:02X}\n", instr_name, operand_str, this->a));
                 this->cycle = 0;
             }
             break;
@@ -898,18 +897,17 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
         case 0x9b:
         case 0x9c:
         case 0x9d:
-        case 0x9f:
-        {
+        case 0x9f: {
             const bool with_carry = this->opcode & 0x08;
             const auto instr_name = with_carry ? "SBC" : "SUB";
-            const auto reg_name = decode_reg8_name(this->opcode & 0x7);
+            const auto reg_name   = decode_reg8_name(this->opcode & 0x7);
 
             log(fmt::format("{} A, {}\n", instr_name, reg_name));
 
-            const auto &reg           = decode_reg8(this->opcode & 0x7);
-            this->a() = this->get_sub(reg, with_carry);
+            const auto &reg = decode_reg8(this->opcode & 0x7);
+            this->a         = this->get_sub(reg, with_carry);
 
-            log(fmt::format("\t\t\t\t\t\t\t\t\t A = A {} {} = ${:02X}\n", instr_name, reg_name, this->a()));
+            log(fmt::format("\t\t\t\t\t\t\t\t\t A = A {} {} = ${:02X}\n", instr_name, reg_name, this->a));
             this->pc += 1;
         } break;
 
@@ -949,7 +947,7 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
                 const auto op_u16      = static_cast<uint16_t>(op_i16);
                 const auto original_sp = this->sp;
                 this->sp               = this->get_add16(this->sp, op_u16);
-                this->set_flag_z(false);
+                this->flag_z           = false;
 
                 log(fmt::format("\t\t\t\t\t\t\t\t\t SP = SP+s8 = ${:04X}{:+d} = ${:04X}\n",
                                 original_sp,
@@ -972,9 +970,9 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
             auto &reg           = decode_reg8(this->opcode & 0x7);
 
             log(fmt::format("AND {}\n", reg_name));
-            this->a() &= reg;
-            this->flags() = (this->a() == 0) ? 0xA0 : 0x20;
-            log(fmt::format("\t\t\t\t\t\t\t\t\t A = A AND {} = ${:02X}\n", reg_name, this->a()));
+            this->a &= reg;
+            this->set_flags(this->a == 0, false, true, false);
+            log(fmt::format("\t\t\t\t\t\t\t\t\t A = A AND {} = ${:02X}\n", reg_name, this->a));
             this->pc += 1;
         } break;
 
@@ -989,13 +987,13 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
             } else if (this->cycle == 1) {
                 const auto operand_address = this->opcode & 0x40 ? this->pc++ : this->hl.r16;
                 const auto operand         = bus.read(operand_address);
-                this->a() &= operand;
-                this->flags() = (this->a() == 0) ? 0xA0 : 0x20;
+                this->a &= operand;
+                this->set_flags(this->a == 0, false, true, false);
 
                 const auto operand_str = this->opcode & 0x40
                                              ? fmt::format("${:02X}", operand)
                                              : fmt::format("${:02X} (@ ${:04X})", operand, operand_address);
-                log(fmt::format("\t\t\t\t\t\t\t\t\t A = A AND {} = ${:02X}\n", operand_str, this->a()));
+                log(fmt::format("\t\t\t\t\t\t\t\t\t A = A AND {} = ${:02X}\n", operand_str, this->a));
                 this->cycle = 0;
             }
             break;
@@ -1022,10 +1020,11 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
 
             const auto instr_name = isxor ? "XOR" : "OR";
             log(fmt::format("{} {}\n", instr_name, reg_name));
-            this->a() = isxor ? this->a() ^ reg : this->a() | reg;
+            this->a = isxor ? this->a ^ reg : this->a | reg;
 
-            this->flags() = (this->a() == 0) ? 0x80 : 0x00;
-            log(fmt::format("\t\t\t\t\t\t\t\t\t A = A {} {} = ${:02X}\n", instr_name, reg_name, this->a()));
+            this->set_flags(this->a == 0, false, false, false);
+
+            log(fmt::format("\t\t\t\t\t\t\t\t\t A = A {} {} = ${:02X}\n", instr_name, reg_name, this->a));
             this->pc += 1;
         } break;
 
@@ -1044,13 +1043,13 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
                 const auto instr_name      = this->opcode & 0x08 ? "XOR" : "OR";
                 const auto operand_address = this->opcode & 0x40 ? this->pc++ : this->hl.r16;
                 const auto operand         = bus.read(operand_address);
-                this->a()                  = this->opcode & 0x08 ? this->a() ^ operand : this->a() | operand;
-                this->flags()              = (this->a() == 0) ? 0x80 : 0x00;
+                this->a                    = this->opcode & 0x08 ? this->a ^ operand : this->a | operand;
+                this->set_flags(this->a == 0, false, false, false);
 
                 const auto operand_str = this->opcode & 0x40
                                              ? fmt::format("${:02X}", operand)
                                              : fmt::format("${:02X} (@ ${:04X})", operand, operand_address);
-                log(fmt::format("\t\t\t\t\t\t\t\t\t A = A {} {} = ${:02X}\n", instr_name, operand_str, this->a()));
+                log(fmt::format("\t\t\t\t\t\t\t\t\t A = A {} {} = ${:02X}\n", instr_name, operand_str, this->a));
                 this->cycle = 0;
             }
             break;
@@ -1064,8 +1063,8 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
         case 0x2D:
         case 0x3D: {
             // single cycle
-            const auto reg_name = decode_reg8_name((this->opcode>>3)&0x7);
-            auto &reg = decode_reg8((this->opcode>>3)&0x7);
+            const auto reg_name = decode_reg8_name((this->opcode >> 3) & 0x7);
+            auto &reg           = decode_reg8((this->opcode >> 3) & 0x7);
 
             log(fmt::format("DEC {}\n", reg_name));
 
@@ -1178,11 +1177,11 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
         case 0xBD:
         case 0xBF: {
             const auto reg_name = decode_reg8_name(this->opcode & 0x7);
-            auto &reg           = decode_reg8(this->opcode & 0x7);
+            const auto reg      = decode_reg8(this->opcode & 0x7);
             log(fmt::format("CP {}\n", reg_name));
             this->get_sub(reg, false);
 
-            log(fmt::format("\t\t\t\t\t\t\t\t\t A (${:02X}) compared to {}\n", this->a(), reg_name));
+            log(fmt::format("\t\t\t\t\t\t\t\t\t A (${:02X}) compared to {} (${:02X})\n", this->a, reg_name, reg));
             this->pc++;
         } break;
 
@@ -1204,7 +1203,10 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
                                              ? fmt::format("${:02X}", operand)
                                              : fmt::format("${:02X} (@ ${:04X})", operand, operand_address);
 
-                log(fmt::format("\t\t\t\t\t\t\t\t\t A (${:02X}) compared to {}\n", this->a(), operand_str));
+                log(fmt::format("\t\t\t\t\t\t\t\t\t A (${:02X}) compared to {} (${:02X})\n",
+                                this->a,
+                                operand_str,
+                                operand));
                 this->cycle = 0;
             }
             break;
@@ -1215,17 +1217,19 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
 
         // relative jumps
         case 0x18:
-            if(this->cycle == 0) {
+            if (this->cycle == 0) {
                 log(fmt::format("JR s8\n"));
                 this->cycle++;
             } else if (this->cycle == 1) {
-                this->tmp1 = bus.read(this->pc+1);
+                this->tmp1 = bus.read(this->pc + 1);
                 this->cycle++;
             } else if (this->cycle == 2) {
                 const int16_t offset = static_cast<int8_t>(this->tmp1);
-                this->pc += offset+2;
-                log(fmt::format("\t\t\t\t\t\t\t\t\t doing relative jump with offset {} to ${:04X}\n", offset, this->pc));
-                this->cycle=0;
+                this->pc += offset + 2;
+                log(fmt::format("\t\t\t\t\t\t\t\t\t doing relative jump with offset {} to ${:04X}\n",
+                                offset,
+                                this->pc));
+                this->cycle = 0;
             }
             break;
 
@@ -1241,10 +1245,10 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
             } else if (this->cycle == 1) {
 
                 const auto cond_bits = (this->opcode >> 3) & 0x3;
-                const bool cond      = cond_bits == 0   ? !this->get_flag_z()
-                                       : cond_bits == 1 ? this->get_flag_z()
-                                       : cond_bits == 2 ? !this->get_flag_c()
-                                                        : this->get_flag_c();
+                const bool cond      = cond_bits == 0   ? !this->flag_z
+                                       : cond_bits == 1 ? this->flag_z
+                                       : cond_bits == 2 ? !this->flag_c
+                                                        : this->flag_c;
                 if (cond) {
                     this->tmp1 = bus.read(this->pc + 1);
                     this->cycle++;
@@ -1256,20 +1260,21 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
             } else if (this->cycle == 2) {
                 const int16_t offset = static_cast<int8_t>(this->tmp1);
                 this->pc += offset + 2; // extra 2 ?
-                log(fmt::format("\t\t\t\t\t\t\t\t\t relative jump taken with offset {} to ${:04X}\n", offset, this->pc));
+                log(fmt::format("\t\t\t\t\t\t\t\t\t relative jump taken with offset {} to ${:04X}\n",
+                                offset,
+                                this->pc));
                 this->cycle = 0;
             }
             break;
 
         case 0xE9: {
-                log(fmt::format("JP HL\n"));
-                this->pc = this->hl.r16;
-                log(fmt::format("\t\t\t\t\t\t\t\t\t jumping to address in HL (${:04X})\n", this->pc));
-            }
-            break;
+            log(fmt::format("JP HL\n"));
+            this->pc = this->hl.r16;
+            log(fmt::format("\t\t\t\t\t\t\t\t\t jumping to address in HL (${:04X})\n", this->pc));
+        } break;
 
         case 0xC3:
-            if(this->cycle == 0) {
+            if (this->cycle == 0) {
                 log(fmt::format("JP a16\n"));
                 this->cycle++;
             } else if (this->cycle == 1) {
@@ -1281,7 +1286,7 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
             } else if (this->cycle == 3) {
                 const uint16_t new_pc = (static_cast<uint16_t>(this->tmp2) << 8) | static_cast<uint16_t>(this->tmp1);
                 log(fmt::format("\t\t\t\t\t\t\t\t\t Jumping to: ${:04X}\n", new_pc));
-                this->pc = new_pc;
+                this->pc    = new_pc;
                 this->cycle = 0;
             }
             break;
@@ -1303,10 +1308,10 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
                 this->pc += 3;
 
                 const auto cond_bits = (this->opcode >> 3) & 0x3;
-                const bool cond      = cond_bits == 0   ? !this->get_flag_z()
-                                       : cond_bits == 1 ? this->get_flag_z()
-                                       : cond_bits == 2 ? !this->get_flag_c()
-                                                        : this->get_flag_c();
+                const bool cond      = cond_bits == 0   ? !this->flag_z
+                                       : cond_bits == 1 ? this->flag_z
+                                       : cond_bits == 2 ? !this->flag_c
+                                                        : this->flag_c;
                 if (cond) {
                     this->cycle++;
                 } else {
@@ -1316,14 +1321,14 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
             } else if (this->cycle == 3) {
                 const uint16_t new_pc = (static_cast<uint16_t>(this->tmp2) << 8) | static_cast<uint16_t>(this->tmp1);
                 log(fmt::format("\t\t\t\t\t\t\t\t\t conditional jump taken to ${:04X}\n", new_pc));
-                this->pc = new_pc;
+                this->pc    = new_pc;
                 this->cycle = 0;
             }
             break;
 
         // Call
         case 0xCD:
-            if(this->cycle == 0) {
+            if (this->cycle == 0) {
                 log(fmt::format("CALL a16\n"));
                 this->cycle++;
             } else if (this->cycle == 1) {
@@ -1335,11 +1340,11 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
             } else if (this->cycle == 3) {
                 this->pc += 3;
                 this->sp--;
-                bus.write(this->sp, (this->pc >> 8)&0xff);
+                bus.write(this->sp, (this->pc >> 8) & 0xff);
                 this->cycle++;
             } else if (this->cycle == 4) {
                 this->sp--;
-                bus.write(this->sp, this->pc&0xff);
+                bus.write(this->sp, this->pc & 0xff);
                 this->cycle++;
             } else if (this->cycle == 5) {
                 this->pc = (static_cast<uint16_t>(this->tmp2) << 8) | static_cast<uint16_t>(this->tmp1);
@@ -1359,10 +1364,10 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
                 this->cycle++;
             } else if (this->cycle == 1) {
                 const auto cond_bits = (this->opcode >> 3) & 0x3;
-                const bool cond      = cond_bits == 0   ? !this->get_flag_z()
-                                       : cond_bits == 1 ? this->get_flag_z()
-                                       : cond_bits == 2 ? !this->get_flag_c()
-                                                        : this->get_flag_c();
+                const bool cond      = cond_bits == 0   ? !this->flag_z
+                                       : cond_bits == 1 ? this->flag_z
+                                       : cond_bits == 2 ? !this->flag_c
+                                                        : this->flag_c;
                 if (cond) {
                     this->tmp1 = bus.read(this->pc + 1); // addr_l
                     this->cycle++;
@@ -1399,31 +1404,29 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
         case 0xDF:
         case 0xEF:
         case 0xFF:
-            if(this->cycle == 0) {
-                this->tmp1 = (this->opcode>>3)&0x7;
-                log(fmt::format("RST {}\n",this->tmp1));
+            if (this->cycle == 0) {
+                this->tmp1 = (this->opcode >> 3) & 0x7;
+                log(fmt::format("RST {}\n", this->tmp1));
                 this->cycle++;
             } else if (this->cycle == 1) {
                 this->pc += 1;
                 this->sp--;
-                bus.write(this->sp, (this->pc >> 8)&0xff);
+                bus.write(this->sp, (this->pc >> 8) & 0xff);
                 this->cycle++;
             } else if (this->cycle == 2) {
                 this->sp--;
-                bus.write(this->sp, this->pc&0xff);
+                bus.write(this->sp, this->pc & 0xff);
                 this->cycle++;
             } else if (this->cycle == 3) {
-                this->pc = 8*this->tmp1;
+                this->pc = 8 * this->tmp1;
                 log(fmt::format("\t\t\t\t\t\t\t\t\t Calling subroutine at: ${:04X}\n", this->pc));
                 this->cycle = 0;
             }
             break;
 
-
-
         // Return
         case 0xC9:
-            if(this->cycle == 0) {
+            if (this->cycle == 0) {
                 log(fmt::format("RET\n"));
                 this->cycle++;
             } else if (this->cycle == 1) {
@@ -1452,10 +1455,10 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
                 this->cycle++;
             } else if (this->cycle == 1) {
                 const auto cond_bits = (this->opcode >> 3) & 0x3;
-                const bool cond      = cond_bits == 0   ? !this->get_flag_z()
-                                       : cond_bits == 1 ? this->get_flag_z()
-                                       : cond_bits == 2 ? !this->get_flag_c()
-                                                        : this->get_flag_c();
+                const bool cond      = cond_bits == 0   ? !this->flag_z
+                                       : cond_bits == 1 ? this->flag_z
+                                       : cond_bits == 2 ? !this->flag_c
+                                                        : this->flag_c;
                 if (cond) {
                     this->cycle++;
                 } else {
@@ -1479,7 +1482,7 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
             break;
 
         case 0xD9:
-            if(this->cycle == 0) {
+            if (this->cycle == 0) {
                 log(fmt::format("RETI\n"));
                 this->cycle++;
             } else if (this->cycle == 1) {
@@ -1492,16 +1495,16 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
                 this->cycle++;
             } else if (this->cycle == 3) {
                 this->ime = true;
-                this->pc = (static_cast<uint16_t>(this->tmp2) << 8) | static_cast<uint16_t>(this->tmp1);
+                this->pc  = (static_cast<uint16_t>(this->tmp2) << 8) | static_cast<uint16_t>(this->tmp1);
                 log(fmt::format("\t\t\t\t\t\t\t\t\t Returning from interrupt handler (interrupts reenabled)\n"));
                 this->cycle = 0;
             }
             break;
 
-
         //-------------------------------------------------------
         // Interrupt stuff
         //-------------------------------------------------------
+
         case 0xF3:
             // single cycle
             log(fmt::format("DI\n"));
@@ -1611,12 +1614,12 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
                     if (this->cycle == 1) {
                         const auto reg_name = decode_reg8_name(this->tmp1 & 0x7);
                         log(fmt::format("SLA {}\n", reg_name));
-                        auto &reg = decode_reg8(this->tmp1 & 0x7);
-                        this->set_flag_c(reg & 0x80);
-                        reg = reg << 1;
-                        this->set_flag_z(reg == 0);
-                        this->set_flag_h(false);
-                        this->set_flag_n(false);
+                        auto &reg    = decode_reg8(this->tmp1 & 0x7);
+                        this->flag_c = reg & 0x80;
+                        reg          = reg << 1;
+                        this->flag_z = reg == 0;
+                        this->flag_h = false;
+                        this->flag_n = false;
 
                         log(fmt::format("\t\t\t\t\t\t\t\t\t Left shift of {} = ${:02X}\n", reg_name, reg));
                         this->pc += 2;
@@ -1632,12 +1635,12 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
                     if (this->cycle == 1) {
                         const auto reg_name = decode_reg8_name(this->tmp1 & 0x7);
                         log(fmt::format("SRA {}\n", reg_name));
-                        auto &reg = decode_reg8(this->tmp1 & 0x7);
-                        this->set_flag_c(reg & 0x01);
-                        reg = (reg & 0x80) | (reg >> 1); // keep msb
-                        this->set_flag_z(reg == 0);
-                        this->set_flag_h(false);
-                        this->set_flag_n(false);
+                        auto &reg    = decode_reg8(this->tmp1 & 0x7);
+                        this->flag_c = reg & 0x01;
+                        reg          = (reg & 0x80) | (reg >> 1); // keep msb
+                        this->flag_z = reg == 0;
+                        this->flag_h = false;
+                        this->flag_n = false;
 
                         log(fmt::format("\t\t\t\t\t\t\t\t\t Arithmetic right shift of {} = ${:02X}\n", reg_name, reg));
                         this->pc += 2;
@@ -1653,12 +1656,12 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
                     if (this->cycle == 1) {
                         const auto reg_name = decode_reg8_name(this->tmp1 & 0x7);
                         log(fmt::format("SWAP {}\n", reg_name));
-                        auto &reg = decode_reg8(this->tmp1 & 0x7);
-                        reg       = ((reg & 0xf) << 4) | ((reg >> 4) & 0xf);
-                        this->set_flag_z(reg == 0);
-                        this->set_flag_h(false);
-                        this->set_flag_c(false);
-                        this->set_flag_n(false);
+                        auto &reg    = decode_reg8(this->tmp1 & 0x7);
+                        reg          = ((reg & 0xf) << 4) | ((reg >> 4) & 0xf);
+                        this->flag_z = reg == 0;
+                        this->flag_h = false;
+                        this->flag_c = false;
+                        this->flag_n = false;
 
                         log(fmt::format("\t\t\t\t\t\t\t\t\t Swapping high and low nibbles of {} = ${:02X}\n",
                                         reg_name,
@@ -1676,12 +1679,12 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
                     if (this->cycle == 1) {
                         const auto reg_name = decode_reg8_name(this->tmp1 & 0x7);
                         log(fmt::format("SRL {}\n", reg_name));
-                        auto &reg = decode_reg8(this->tmp1 & 0x7);
-                        this->set_flag_c(reg & 0x01);
-                        reg = reg >> 1; // unsigned shift drop msb correctly
-                        this->set_flag_z(reg == 0);
-                        this->set_flag_h(false);
-                        this->set_flag_n(false);
+                        auto &reg    = decode_reg8(this->tmp1 & 0x7);
+                        this->flag_c = reg & 0x01;
+                        reg          = reg >> 1; // unsigned shift drop msb correctly
+                        this->flag_z = reg == 0;
+                        this->flag_h = false;
+                        this->flag_n = false;
 
                         log(fmt::format("\t\t\t\t\t\t\t\t\t Logical right shift of {} = ${:02X}\n", reg_name, reg));
                         this->pc += 2;
@@ -1741,9 +1744,9 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
                     } else if (this->cycle == 2) {
                         const auto bit = (this->tmp1 >> 3) & 0x7;
                         const auto &op = bus.read(this->hl.r16);
-                        this->set_flag_z(op & (1 << bit));
-                        this->set_flag_n(false);
-                        this->set_flag_h(true);
+                        this->flag_z   = op & (1 << bit);
+                        this->flag_n   = false;
+                        this->flag_h   = true;
 
                         log(fmt::format("\t\t\t\t\t\t\t\t\t Testing bit {} of memory location (HL)=${:04X} = ${:02X}\n",
                                         bit,
@@ -1759,9 +1762,9 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
 
                         log(fmt::format("BIT {}, {}\n", bit, reg_name));
                         const auto &reg = decode_reg8(this->tmp1 & 0x7);
-                        this->set_flag_z(reg & (1 << bit));
-                        this->set_flag_n(false);
-                        this->set_flag_h(true);
+                        this->flag_z    = reg & (1 << bit);
+                        this->flag_n    = false;
+                        this->flag_h    = true;
 
                         log(fmt::format("\t\t\t\t\t\t\t\t\t Testing bit {} of register {} = ${:02X}\n",
                                         bit,
@@ -1773,7 +1776,8 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
                 }
             } else {
                 log(fmt::format("???\n"));
-                throw std::runtime_error(fmt::format("UNKNOWN EXTENDED OPCODE ${:02X} at PC=${:04X}", this->tmp1, this->pc));
+                throw std::runtime_error(
+                    fmt::format("UNKNOWN EXTENDED OPCODE ${:02X} at PC=${:04X}", this->tmp1, this->pc));
             }
 
             break;
@@ -1786,11 +1790,11 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
 
 void Cpu::dump(std::ostream &os) const {
 
-    os << fmt::format("  af: {:04X}\n", this->af.r16);
-    os << fmt::format("  bc: {:04X}\n", this->bc.r16);
-    os << fmt::format("  de: {:04X}\n", this->de.r16);
-    os << fmt::format("  hl: {:04X}\n", this->hl.r16);
-    os << fmt::format("  pc: {:04X}\n", this->pc);
-    os << fmt::format("  sp: {:04X}\n", this->sp);
+    os << fmt::format("  af: ${:02X}{:02X}\n", this->a, this->f());
+    os << fmt::format("  bc: ${:04X}\n", this->bc.r16);
+    os << fmt::format("  de: ${:04X}\n", this->de.r16);
+    os << fmt::format("  hl: ${:04X}\n", this->hl.r16);
+    os << fmt::format("  pc: ${:04X}\n", this->pc);
+    os << fmt::format("  sp: ${:04X}\n", this->sp);
     os << fmt::format(" ime: {}\n", this->ime);
 }
