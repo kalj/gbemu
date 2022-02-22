@@ -790,7 +790,6 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
             this->pc += 1;
         } break;
 
-
         case 0x09: // ADD HL, r16
         case 0x19:
         case 0x29:
@@ -930,8 +929,7 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
             log(fmt::format("\t\t\t\t\t\t\t\t\t {} decremented to ${:02X}\n", reg_name, reg));
 
             this->pc += 1;
-            break;
-        }
+        } break;
 
         // INC {B,C,D,E,H,L,A}
         case 0x04:
@@ -1027,21 +1025,44 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
             break;
 
         // Comparison
+        case 0xB8:
+        case 0xB9:
+        case 0xBA:
+        case 0xBB:
+        case 0xBC:
+        case 0xBD:
+        case 0xBF: {
+            const auto reg_name = decode_reg8_name(this->opcode & 0x7);
+            auto &reg           = decode_reg8(this->opcode & 0x7);
+            log(fmt::format("CP {}\n", reg_name));
+            this->get_sub(reg, false);
+
+            log(fmt::format("\t\t\t\t\t\t\t\t\t A (${:02X}) compared to {}\n", this->a(), reg_name));
+            this->pc++;
+        } break;
+
+        case 0xBE:
         case 0xFE:
-            if(this->cycle == 0) {
-                log(fmt::format("CP d8\n"));
+            if (this->cycle == 0) {
+                const auto operand_name = this->opcode & 0x40 ? "d8" : "(HL)";
+
+                log(fmt::format("CP {}\n", operand_name));
                 this->cycle++;
-            } else {
-                const auto val = bus.read(this->pc + 1);
-                this->get_sub(val, false);
+                this->pc++;
+            } else if (this->cycle == 1) {
+                const auto operand_address = this->opcode & 0x40 ? this->pc++ : this->hl.r16;
+                const auto operand         = bus.read(operand_address);
 
-                log(fmt::format("\t\t\t\t\t\t\t\t\t a (${:02X}) compared to ${:02X}\n", this->a(), val));
+                this->get_sub(operand, false);
 
-                this->pc += 2;
-                this->cycle=0;
+                const auto operand_str = this->opcode & 0x40
+                                             ? fmt::format("${:02X}", operand)
+                                             : fmt::format("${:02X} (@ ${:04X})", operand, operand_address);
+
+                log(fmt::format("\t\t\t\t\t\t\t\t\t A (${:02X}) compared to {}\n", this->a(), operand_str));
+                this->cycle = 0;
             }
             break;
-
 
         //-------------------------------------------------------
         // Jumps
