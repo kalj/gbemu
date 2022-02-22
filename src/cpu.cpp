@@ -1021,6 +1021,48 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
             }
             break;
 
+        case 0xC4:
+        case 0xCC:
+        case 0xD4: // CALL <COND>, a16
+        case 0xDC:
+            if (this->cycle == 0) {
+                const auto cond_bits = (this->opcode >> 3) & 0x3;
+                const auto cond_str  = cond_bits == 0 ? "NZ" : cond_bits == 1 ? "Z" : cond_bits == 2 ? "NC" : "C";
+                log(fmt::format("CALL {}, a16\n", cond_str));
+                this->cycle++;
+            } else if (this->cycle == 1) {
+                const auto cond_bits = (this->opcode >> 3) & 0x3;
+                const bool cond      = cond_bits == 0   ? !this->get_flag_z()
+                                       : cond_bits == 1 ? this->get_flag_z()
+                                       : cond_bits == 2 ? !this->get_flag_c()
+                                                        : this->get_flag_c();
+                if (cond) {
+                    this->tmp1 = bus.read(this->pc + 1); // addr_l
+                    this->cycle++;
+                } else {
+                    log(fmt::format("\t\t\t\t\t\t\t\t\t conditional call NOT taken\n"));
+                    this->pc += 3;
+                    this->cycle = 0;
+                }
+            } else if (this->cycle == 2) {
+                this->tmp2 = bus.read(this->pc + 2); // addr_h
+                this->cycle++;
+            } else if (this->cycle == 3) {
+                this->pc += 3;
+                this->sp--;
+                bus.write(this->sp, (this->pc >> 8) & 0xff);
+                this->cycle++;
+            } else if (this->cycle == 4) {
+                this->sp--;
+                bus.write(this->sp, this->pc & 0xff);
+                this->cycle++;
+            } else if (this->cycle == 5) {
+                this->pc = (static_cast<uint16_t>(this->tmp2) << 8) | static_cast<uint16_t>(this->tmp1);
+                log(fmt::format("\t\t\t\t\t\t\t\t\t Conditional calling to subroutine at: ${:04X}\n", this->pc));
+                this->cycle = 0;
+            }
+            break;
+
         // RST n
         case 0xC7:
         case 0xD7:
