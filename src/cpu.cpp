@@ -1216,6 +1216,45 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
                         this->cycle = 0;
                     }
                 }
+            } else if ((this->tmp1 & 0b11000000) == 0b01000000) { // BIT <bit>, r
+                if ((this->tmp1 & 0x7) == 0x6) {                  // BIT <bit>, (HL)
+                    if (this->cycle == 1) {
+                        const auto bit = (this->tmp1 >> 3) & 0x7;
+                        log(fmt::format("BIT {}, (HL)\n", bit));
+                        this->cycle++;
+                    } else if (this->cycle == 2) {
+                        const auto bit = (this->tmp1 >> 3) & 0x7;
+                        const auto &op = bus.read(this->hl.r16);
+                        this->set_flag_z(op & (1 << bit));
+                        this->set_flag_n(false);
+                        this->set_flag_h(true);
+
+                        log(fmt::format("\t\t\t\t\t\t\t\t\t Testing bit {} of memory location (HL)=${:04X} = ${:02X}\n",
+                                        bit,
+                                        this->hl.r16,
+                                        op));
+                        this->pc += 2;
+                        this->cycle = 0;
+                    }
+                } else {
+                    if (this->cycle == 1) {
+                        const auto reg_name = decode_reg8_name(this->tmp1 & 0x7);
+                        const auto bit      = (this->tmp1 >> 3) & 0x7;
+
+                        log(fmt::format("BIT {}, {}\n", bit, reg_name));
+                        const auto &reg = decode_reg8(this->tmp1 & 0x7);
+                        this->set_flag_z(reg & (1 << bit));
+                        this->set_flag_n(false);
+                        this->set_flag_h(true);
+
+                        log(fmt::format("\t\t\t\t\t\t\t\t\t Testing bit {} of register {} = ${:02X}\n",
+                                        bit,
+                                        reg_name,
+                                        reg));
+                        this->pc += 2;
+                        this->cycle = 0;
+                    }
+                }
             } else {
                 log(fmt::format("???\n"));
                 throw std::runtime_error(fmt::format("UNKNOWN EXTENDED OPCODE ${:02X} at PC=${:04X}", this->tmp1, this->pc));
