@@ -136,7 +136,7 @@ uint8_t Cpu::get_sub(uint8_t val, bool with_carry) {
 
 uint8_t Cpu::get_inc(uint8_t oldval) {
     const uint8_t res5 = (oldval & 0xf) + 1;
-    const auto newval  = oldval + 1;
+    const uint8_t newval  = oldval + 1;
 
     this->set_flag_h(res5 & 0x10);
     this->set_flag_z(newval == 0);
@@ -147,7 +147,7 @@ uint8_t Cpu::get_inc(uint8_t oldval) {
 
 uint8_t Cpu::get_dec(uint8_t oldval) {
     const uint8_t res5 = (oldval & 0xf) - 1;
-    const auto newval  = oldval - 1;
+    const uint8_t newval  = oldval - 1;
 
     this->set_flag_h(res5 & 0x10);
     this->set_flag_z(newval == 0);
