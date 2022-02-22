@@ -656,6 +656,30 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
             }
             break;
 
+        // store SP to immediate address
+        case 0x08:
+            if (this->cycle == 0) {
+                log(fmt::format("LD (a16), SP\n"));
+                this->cycle++;
+            } else if (this->cycle == 1) {
+                this->tmp1 = bus.read(this->pc + 1);
+                this->cycle++;
+            } else if (this->cycle == 2) {
+                this->tmp2 = bus.read(this->pc + 2);
+                this->cycle++;
+            } else if (this->cycle == 3) {
+                const uint16_t addr = (static_cast<uint16_t>(this->tmp2) << 8) | static_cast<uint16_t>(this->tmp1);
+                bus.write(addr, this->sp & 0xff);
+                this->cycle++;
+            } else if (this->cycle == 4) {
+                const uint16_t addr = (static_cast<uint16_t>(this->tmp2) << 8) | static_cast<uint16_t>(this->tmp1);
+                bus.write(addr + 1, (this->sp >> 8) & 0xff);
+                log(fmt::format("\t\t\t\t\t\t\t\t\t SP (${:04X}) stored to ${:04X}\n", this->sp, addr));
+                this->pc += 3;
+                this->cycle = 0;
+            }
+            break;
+
         //-------------------------------------------------------
         // stack operations
         //-------------------------------------------------------
