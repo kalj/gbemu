@@ -91,6 +91,11 @@ private:
     uint8_t get_inc(uint8_t oldval);
     uint8_t get_dec(uint8_t oldval);
 
+    void rlc(uint8_t &reg, bool with_z_flag);
+    void rrc(uint8_t &reg, bool with_z_flag);
+    void rl(uint8_t &reg, bool with_z_flag);
+    void rr(uint8_t &reg, bool with_z_flag);
+
     // registers
     reg af{0};
     reg bc{0};

@@ -156,6 +156,39 @@ uint8_t Cpu::get_dec(uint8_t oldval) {
     return newval;
 }
 
+void Cpu::rlc(uint8_t &reg, bool with_z_flag) {
+    this->set_flag_c(reg & 0x80);           // bit 7 goes into carry
+    reg = (reg << 1) | ((reg & 0x80) >> 7); // rotate left without carry
+    this->set_flag_h(false);
+    this->set_flag_n(false);
+    this->set_flag_z(with_z_flag && reg == 0);
+}
+
+void Cpu::rrc(uint8_t &reg, bool with_z_flag) {
+    this->set_flag_c(reg & 0x01);           // bit 0 goes into carry
+    reg = ((reg & 0x01) << 7) | (reg >> 1); // rotate right without carry
+    this->set_flag_z(with_z_flag && reg == 0);
+    this->set_flag_h(false);
+    this->set_flag_n(false);
+}
+
+void Cpu::rl(uint8_t &reg, bool with_z_flag) {
+    const uint8_t res = (reg << 1) | (this->get_flag_c() ? 0x01 : 0x00); // rotate left with carry.
+    this->set_flag_c(reg & 0x80);                                        // bit 7 goes into carry
+    reg = res;
+    this->set_flag_z(with_z_flag && reg == 0);
+    this->set_flag_h(false);
+    this->set_flag_n(false);
+}
+
+void Cpu::rr(uint8_t &reg, bool with_z_flag) {
+    const uint8_t res = (this->get_flag_c() ? 0x80 : 0x00) | (reg >> 1); // rotate right with carry;
+    this->set_flag_c(reg & 0x01);                                        // bit 0 goes into carry
+    reg = res;
+    this->set_flag_z(with_z_flag && reg == 0);
+    this->set_flag_h(false);
+    this->set_flag_n(false);
+}
 
 void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
 
@@ -677,6 +710,38 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
             //-------------------------------------------------------
             // ALU
             //-------------------------------------------------------
+        case 0x07: // RLCA
+        {
+            log(fmt::format("RLCA\n"));
+            this->rlc(this->a(), false);
+
+            log(fmt::format("\t\t\t\t\t\t\t\t\t 8-bit rotate left of A = ${:02X}\n", this->a()));
+            this->pc += 1;
+        } break;
+        case 0x0F: // RRCA
+        {
+            log(fmt::format("RRCA\n"));
+            this->rrc(this->a(), false);
+
+            log(fmt::format("\t\t\t\t\t\t\t\t\t 8-bit rotate right of A = ${:02X}\n", this->a()));
+            this->pc += 1;
+        } break;
+        case 0x17: // RLA
+        {
+            log(fmt::format("RLA\n"));
+            this->rl(this->a(), false);
+
+            log(fmt::format("\t\t\t\t\t\t\t\t\t 9-bit rotate left of A = ${:02X}\n", this->a()));
+            this->pc += 1;
+        } break;
+        case 0x1F: // RRA
+        {
+            log(fmt::format("RRA\n"));
+            this->rr(this->a(), false);
+
+            log(fmt::format("\t\t\t\t\t\t\t\t\t 9-bit rotate right of A = ${:02X}\n", this->a()));
+            this->pc += 1;
+        } break;
 
         case 0x80: // ADD
         case 0x81:
@@ -1376,6 +1441,7 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
         //-------------------------------------------------------
         // Extended instruction set
         //-------------------------------------------------------
+
         case 0xCB:
             if (this->cycle == 0) {
                 log(fmt::format("16-bit instruction\n"));
@@ -1388,54 +1454,200 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
                 log(fmt::format("\t\t\t\t\t\t\t\t read extended opcode: ${:02X} -> ", this->tmp1));
             }
 
-            if((this->tmp1&0b11111000)==0b00110000) { // SWAP
-                if(this->tmp1==0x36) { // SWAP (HL)
+            if ((this->tmp1 & 0b11111000) == 0b00000000) { // RLC
+                if ((this->tmp1 & 0x7) == 0x06) {          // RLC (HL)
                     log(fmt::format("???\n"));
-                    throw std::runtime_error(fmt::format("UNKNOWN EXTENDED OPCODE ${:02X} at PC=${:04X}", this->tmp1, this->pc));
+                    throw std::runtime_error(
+                        fmt::format("UNKNOWN EXTENDED OPCODE ${:02X} at PC=${:04X}", this->tmp1, this->pc));
+                } else {
+                    if (this->cycle == 1) {
+                        const auto reg_name = decode_reg8_name(this->tmp1 & 0x7);
+                        log(fmt::format("RLC {}\n", reg_name));
+                        auto &reg = decode_reg8(this->tmp1 & 0x7);
+                        this->rlc(reg, true);
+
+                        log(fmt::format("\t\t\t\t\t\t\t\t\t 8-bit rotate left of {} = ${:02X}\n", reg_name, reg));
+                        this->pc += 2;
+                        this->cycle = 0;
+                    }
+                }
+            } else if ((this->tmp1 & 0b11111000) == 0b00001000) { // RRC
+                if ((this->tmp1 & 0x7) == 0x06) {                 // RRC (HL)
+                    log(fmt::format("???\n"));
+                    throw std::runtime_error(
+                        fmt::format("UNKNOWN EXTENDED OPCODE ${:02X} at PC=${:04X}", this->tmp1, this->pc));
+                } else {
+                    if (this->cycle == 1) {
+                        const auto reg_name = decode_reg8_name(this->tmp1 & 0x7);
+                        log(fmt::format("RRC {}\n", reg_name));
+                        auto &reg = decode_reg8(this->tmp1 & 0x7);
+                        this->rrc(reg, true);
+
+                        log(fmt::format("\t\t\t\t\t\t\t\t\t 8-bit rotate right of {} = ${:02X}\n", reg_name, reg));
+                        this->pc += 2;
+                        this->cycle = 0;
+                    }
+                }
+            } else if ((this->tmp1 & 0b11111000) == 0b00010000) { // RL
+                if ((this->tmp1 & 0x7) == 0x06) {                 // RL (HL)
+                    log(fmt::format("???\n"));
+                    throw std::runtime_error(
+                        fmt::format("UNKNOWN EXTENDED OPCODE ${:02X} at PC=${:04X}", this->tmp1, this->pc));
+                } else {
+                    if (this->cycle == 1) {
+                        const auto reg_name = decode_reg8_name(this->tmp1 & 0x7);
+                        log(fmt::format("RL {}\n", reg_name));
+                        auto &reg = decode_reg8(this->tmp1 & 0x7);
+                        this->rl(reg, true);
+
+                        log(fmt::format("\t\t\t\t\t\t\t\t\t 9-bit rotate left of {} = ${:02X}\n", reg_name, reg));
+                        this->pc += 2;
+                        this->cycle = 0;
+                    }
+                }
+            } else if ((this->tmp1 & 0b11111000) == 0b00011000) { // RR
+                if ((this->tmp1 & 0x7) == 0x06) {                 // RR (HL)
+                    log(fmt::format("???\n"));
+                    throw std::runtime_error(
+                        fmt::format("UNKNOWN EXTENDED OPCODE ${:02X} at PC=${:04X}", this->tmp1, this->pc));
+                } else {
+                    if (this->cycle == 1) {
+                        const auto reg_name = decode_reg8_name(this->tmp1 & 0x7);
+                        log(fmt::format("RR {}\n", reg_name));
+                        auto &reg = decode_reg8(this->tmp1 & 0x7);
+                        this->rr(reg, true);
+
+                        log(fmt::format("\t\t\t\t\t\t\t\t\t 9-bit rotate right of {} = ${:02X}\n", reg_name, reg));
+                        this->pc += 2;
+                        this->cycle = 0;
+                    }
+                }
+            } else if ((this->tmp1 & 0b11111000) == 0b00100000) { // SLA
+                if ((this->tmp1 & 0x7) == 0x06) {                 // SLA (HL)
+                    log(fmt::format("???\n"));
+                    throw std::runtime_error(
+                        fmt::format("UNKNOWN EXTENDED OPCODE ${:02X} at PC=${:04X}", this->tmp1, this->pc));
+                } else {
+                    if (this->cycle == 1) {
+                        const auto reg_name = decode_reg8_name(this->tmp1 & 0x7);
+                        log(fmt::format("SLA {}\n", reg_name));
+                        auto &reg = decode_reg8(this->tmp1 & 0x7);
+                        this->set_flag_c(reg & 0x80);
+                        reg = reg << 1;
+                        this->set_flag_z(reg == 0);
+                        this->set_flag_h(false);
+                        this->set_flag_n(false);
+
+                        log(fmt::format("\t\t\t\t\t\t\t\t\t Left shift of {} = ${:02X}\n", reg_name, reg));
+                        this->pc += 2;
+                        this->cycle = 0;
+                    }
+                }
+            } else if ((this->tmp1 & 0b11111000) == 0b00101000) { // SRA
+                if ((this->tmp1 & 0x7) == 0x06) {                 // SRA (HL)
+                    log(fmt::format("???\n"));
+                    throw std::runtime_error(
+                        fmt::format("UNKNOWN EXTENDED OPCODE ${:02X} at PC=${:04X}", this->tmp1, this->pc));
+                } else {
+                    if (this->cycle == 1) {
+                        const auto reg_name = decode_reg8_name(this->tmp1 & 0x7);
+                        log(fmt::format("SRA {}\n", reg_name));
+                        auto &reg = decode_reg8(this->tmp1 & 0x7);
+                        this->set_flag_c(reg & 0x01);
+                        reg = (reg & 0x80) | (reg >> 1); // keep msb
+                        this->set_flag_z(reg == 0);
+                        this->set_flag_h(false);
+                        this->set_flag_n(false);
+
+                        log(fmt::format("\t\t\t\t\t\t\t\t\t Arithmetic right shift of {} = ${:02X}\n", reg_name, reg));
+                        this->pc += 2;
+                        this->cycle = 0;
+                    }
+                }
+            } else if ((this->tmp1 & 0b11111000) == 0b00110000) { // SWAP
+                if ((this->tmp1 & 0x7) == 0x06) {                 // SWAP (HL)
+                    log(fmt::format("???\n"));
+                    throw std::runtime_error(
+                        fmt::format("UNKNOWN EXTENDED OPCODE ${:02X} at PC=${:04X}", this->tmp1, this->pc));
                 } else {
                     if (this->cycle == 1) {
                         const auto reg_name = decode_reg8_name(this->tmp1 & 0x7);
                         log(fmt::format("SWAP {}\n", reg_name));
                         auto &reg = decode_reg8(this->tmp1 & 0x7);
                         reg       = ((reg & 0xf) << 4) | ((reg >> 4) & 0xf);
+                        this->set_flag_z(reg == 0);
+                        this->set_flag_h(false);
+                        this->set_flag_c(false);
+                        this->set_flag_n(false);
 
-                        log(fmt::format("\t\t\t\t\t\t\t\t\t Swapping high and low nibbles of {} = ${:02X}\n", reg_name, reg));
+                        log(fmt::format("\t\t\t\t\t\t\t\t\t Swapping high and low nibbles of {} = ${:02X}\n",
+                                        reg_name,
+                                        reg));
                         this->pc += 2;
                         this->cycle = 0;
                     }
                 }
-            } else if((this->tmp1&0b11000000)==0b10000000) { // RES <bit>, r
-                if((this->tmp1&0b00000111)==0b110) { // RES <bit>, (HL)
+            } else if ((this->tmp1 & 0b11111000) == 0b00111000) { // SRL
+                if ((this->tmp1 & 0x7) == 0x06) {                 // SRL (HL)
                     log(fmt::format("???\n"));
-                    throw std::runtime_error(fmt::format("UNKNOWN EXTENDED OPCODE ${:02X} at PC=${:04X}", this->tmp1, this->pc));
+                    throw std::runtime_error(
+                        fmt::format("UNKNOWN EXTENDED OPCODE ${:02X} at PC=${:04X}", this->tmp1, this->pc));
                 } else {
                     if (this->cycle == 1) {
                         const auto reg_name = decode_reg8_name(this->tmp1 & 0x7);
-                        const auto bit = (this->tmp1 >> 3) & 0x7;
+                        log(fmt::format("SRL {}\n", reg_name));
+                        auto &reg = decode_reg8(this->tmp1 & 0x7);
+                        this->set_flag_c(reg & 0x01);
+                        reg = reg >> 1; // unsigned shift drop msb correctly
+                        this->set_flag_z(reg == 0);
+                        this->set_flag_h(false);
+                        this->set_flag_n(false);
+
+                        log(fmt::format("\t\t\t\t\t\t\t\t\t Logical right shift of {} = ${:02X}\n", reg_name, reg));
+                        this->pc += 2;
+                        this->cycle = 0;
+                    }
+                }
+            } else if ((this->tmp1 & 0b11000000) == 0b10000000) { // RES <bit>, r
+                if ((this->tmp1 & 0x7) == 0x06) {                 // RES <bit>, (HL)
+                    log(fmt::format("???\n"));
+                    throw std::runtime_error(
+                        fmt::format("UNKNOWN EXTENDED OPCODE ${:02X} at PC=${:04X}", this->tmp1, this->pc));
+                } else {
+                    if (this->cycle == 1) {
+                        const auto reg_name = decode_reg8_name(this->tmp1 & 0x7);
+                        const auto bit      = (this->tmp1 >> 3) & 0x7;
 
                         log(fmt::format("RES {}, {}\n", bit, reg_name));
                         auto &reg = decode_reg8(this->tmp1 & 0x7);
-                        reg       &= ~(1<<bit);
+                        reg &= ~(1 << bit);
 
-                        log(fmt::format("\t\t\t\t\t\t\t\t\t Resetting bit {} of register {} = ${:02X}\n", bit, reg_name, reg));
+                        log(fmt::format("\t\t\t\t\t\t\t\t\t Resetting bit {} of register {} = ${:02X}\n",
+                                        bit,
+                                        reg_name,
+                                        reg));
                         this->pc += 2;
                         this->cycle = 0;
                     }
                 }
-            } else if((this->tmp1&0b11000000)==0b11000000) { // SET <bit>, r
-                if((this->tmp1&0b00000111)==0b110) { // SET <bit>, (HL)
+            } else if ((this->tmp1 & 0b11000000) == 0b11000000) { // SET <bit>, r
+                if ((this->tmp1 & 0x7) == 0x6) {                  // SET <bit>, (HL)
                     log(fmt::format("???\n"));
-                    throw std::runtime_error(fmt::format("UNKNOWN EXTENDED OPCODE ${:02X} at PC=${:04X}", this->tmp1, this->pc));
+                    throw std::runtime_error(
+                        fmt::format("UNKNOWN EXTENDED OPCODE ${:02X} at PC=${:04X}", this->tmp1, this->pc));
                 } else {
                     if (this->cycle == 1) {
                         const auto reg_name = decode_reg8_name(this->tmp1 & 0x7);
-                        const auto bit = (this->tmp1 >> 3) & 0x7;
+                        const auto bit      = (this->tmp1 >> 3) & 0x7;
 
                         log(fmt::format("SET {}, {}\n", bit, reg_name));
                         auto &reg = decode_reg8(this->tmp1 & 0x7);
-                        reg       |= (1<<bit);
+                        reg |= (1 << bit);
 
-                        log(fmt::format("\t\t\t\t\t\t\t\t\t Setting bit {} of register {} = ${:02X}\n", bit, reg_name, reg));
+                        log(fmt::format("\t\t\t\t\t\t\t\t\t Setting bit {} of register {} = ${:02X}\n",
+                                        bit,
+                                        reg_name,
+                                        reg));
                         this->pc += 2;
                         this->cycle = 0;
                     }
