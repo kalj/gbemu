@@ -210,6 +210,33 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
             this->cycle = 0; // start over
             break;
 
+        case 0x2F: { // Complement A
+            log(fmt::format("CPL\n"));
+            this->a() = ~(this->a());
+            this->set_flag_h(true);
+            this->set_flag_n(true);
+            log(fmt::format("\t\t\t\t\t\t\t\t\t A = ~A = ${:02X}\n", this->a()));
+            this->pc += 1;
+        } break;
+
+        case 0x37: { // Set carry flag
+            log(fmt::format("SCF\n"));
+            this->set_flag_c(true);
+            this->set_flag_h(false);
+            this->set_flag_n(false);
+            log(fmt::format("\t\t\t\t\t\t\t\t\t Setting the carry flag\n"));
+            this->pc++;
+        } break;
+
+        case 0x3F: { // Flip ("complement") carry flag
+            log(fmt::format("CCF\n"));
+            this->set_flag_c(!this->get_flag_c());
+            this->set_flag_h(false);
+            this->set_flag_n(false);
+            log(fmt::format("\t\t\t\t\t\t\t\t\t Flipping the carry flag, new value: {}\n", this->get_flag_c()));
+            this->pc++;
+        } break;
+
         //-------------------------------------------------------
         // LD
         //-------------------------------------------------------
@@ -1015,15 +1042,6 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
             }
             break;
 
-        // Complement
-        case 0x2F: // CPL
-        {
-            log(fmt::format("CPL\n"));
-            this->a()     = ~(this->a());
-            this->flags() = (this->a() & 0b10010000) | 0b01100000;
-            log(fmt::format("\t\t\t\t\t\t\t\t\t A = ~A = ${:02X}\n", this->a()));
-            this->pc += 1;
-        } break;
 
         //-------------------------------------------------------
         // Jumps
