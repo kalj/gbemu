@@ -266,6 +266,34 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
             this->cycle = 0; // start over
             break;
 
+        case 0x27: { // BCD adjust A
+            log(fmt::format("DAA\n"));
+            const auto olda = this->a;
+
+            if (this->flag_n) {
+                if (this->flag_c) {
+                    this->a -= 0x60;
+                }
+                if (this->flag_h) {
+                    this->a -= 0x06;
+                }
+            } else {
+                if ((this->a > 0x99) || this->flag_c) {
+                    this->a += 0x60;
+                    this->flag_c = true;
+                }
+
+                if ((this->a & 0x0f) > 9 || this->flag_h) {
+                    this->a += 6;
+                }
+            }
+
+            this->flag_h = false;
+            this->flag_z = this->a == 0;
+            log(fmt::format("\t\t\t\t\t\t\t\t\t BCD adjusting A from ${:02X} to ${:02X}\n", olda, this->a));
+            this->pc += 1;
+        } break;
+
         case 0x2F: { // Complement A
             log(fmt::format("CPL\n"));
             this->a      = ~(this->a);
