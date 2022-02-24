@@ -139,6 +139,23 @@ uint16_t Cpu::get_add16(const uint16_t r1, const uint16_t r2) {
     return res17 & 0xffff;
 }
 
+uint16_t Cpu::get_add_sp(int8_t s8) {
+
+    const auto s16 = static_cast<int16_t>(s8);
+    const auto u16 = static_cast<uint16_t>(s16);
+
+    const uint16_t res5 = (this->sp & 0x000f) + (u16 & 0x000f);
+    const uint16_t res9 = (this->sp & 0x00ff) + (u16 & 0x00ff);
+    const uint16_t res  = this->sp + u16;
+
+    this->flag_h = res5 & 0x10;
+    this->flag_c = res9 & 0x100;
+    this->flag_n = false;
+    this->flag_z = false;
+
+    return res;
+}
+
 uint8_t Cpu::get_inc(uint8_t oldval) {
     const uint8_t res5   = (oldval & 0xf) + 1;
     const uint8_t newval = oldval + 1;
@@ -662,12 +679,8 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
                 this->tmp1 = bus.read(this->pc + 1);
                 this->cycle++;
             } else if (this->cycle == 2) {
-                const auto op_i8  = static_cast<int8_t>(this->tmp1);
-                const auto op_i16 = static_cast<int16_t>(op_i8);
-                const auto op_u16 = static_cast<uint16_t>(op_i16);
-                this->hl.r16      = this->get_add16(this->sp, op_u16);
-                this->flag_z      = false;
-
+                const auto op_i8 = static_cast<int8_t>(this->tmp1);
+                this->hl.r16     = this->get_add_sp(op_i8);
                 log(fmt::format("\t\t\t\t\t\t\t\t\t HL = SP+s8 = ${:04X} {:+d} = ${:04X}\n",
                                 this->sp,
                                 op_i8,
@@ -943,11 +956,8 @@ void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
                 this->cycle++;
             } else if (this->cycle == 3) {
                 const auto op_i8       = static_cast<int8_t>(this->tmp1);
-                const auto op_i16      = static_cast<int16_t>(op_i8);
-                const auto op_u16      = static_cast<uint16_t>(op_i16);
                 const auto original_sp = this->sp;
-                this->sp               = this->get_add16(this->sp, op_u16);
-                this->flag_z           = false;
+                this->sp               = this->get_add_sp(op_i8);
 
                 log(fmt::format("\t\t\t\t\t\t\t\t\t SP = SP+s8 = ${:04X}{:+d} = ${:04X}\n",
                                 original_sp,
