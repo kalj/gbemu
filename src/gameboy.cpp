@@ -78,9 +78,9 @@ void Gameboy::print_header() const {
     fmt::print("Color byte (${:04X}): ${:02X}\n\n", 0x143, this->rom[0x143]);
 
     if (this->rom[0x144] == 0 && this->rom[0x145] == 0) {
-        fmt::print("No new-style license\n\n");
+        fmt::print("No new-style licensee code\n\n");
     } else {
-        fmt::print("License (new):  {:c}{:c}\n\n", rom[0x144], this->rom[0x145]);
+        fmt::print("Licensee code (new):  {:c}{:c}\n\n", rom[0x144], this->rom[0x145]);
     }
 
     fmt::print("SGB indicator (${:04X}): ${:02X}\n\n", 0x146, this->rom[0x146]);
@@ -112,7 +112,7 @@ void Gameboy::print_header() const {
                this->rom[0x14a],
                this->rom[0x14a] == 0 ? "Japanese" : "Non-Japanese");
 
-    fmt::print("License code (old) (${:04X}): ${:02X}\n\n", 0x14b, this->rom[0x14b]);
+    fmt::print("Licensee code (old) (${:04X}): ${:02X}\n\n", 0x14b, this->rom[0x14b]);
 
     fmt::print("Mask ROM Version (${:04X}): ${:02X}\n\n", 0x14c, this->rom[0x14c]);
 
