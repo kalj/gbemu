@@ -2,12 +2,13 @@
 #include "log.h"
 
 #include <fmt/core.h>
+#include <chrono>
+#include <csignal>
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <iterator>
 #include <vector>
-#include <csignal>
 
 #include <CLI/CLI.hpp>
 
@@ -19,7 +20,7 @@ int main(int argc, char **argv) {
 
     std::filesystem::path rom_path;
     bool verbose = false;
-    bool nowin = false;
+    bool nowin   = false;
     app.add_option("cartridge_rom", rom_path, "Path to cartridge rom file")->required()->check(CLI::ExistingFile);
     app.add_flag("-v,--verbose", verbose, "Enable verbose log output");
     app.add_flag("-n,--nowin", nowin, "Disable launching SDL2 window");
@@ -35,7 +36,7 @@ int main(int argc, char **argv) {
 
     std::vector<uint8_t> cartridge_rom_contents(std::istreambuf_iterator<char>(infile), {});
 
-    if(verbose) {
+    if (verbose) {
         log_set_enable(true);
     }
 
@@ -74,38 +75,39 @@ int main(int argc, char **argv) {
     fmt::print("------------------------------------------------------\n");
     fmt::print("Starting execution\n\n");
 
-    int res=0;
-
+    int res  = 0;
+    auto tic = std::chrono::high_resolution_clock::now();
     try {
         bool running = true;
-        int i=0;
-        while(running) {
+        int i        = 0;
+        while (running) {
 
-            if(!nowin) {
+            if (!nowin) {
                 SDL_Event event;
-                while (SDL_PollEvent(&event))
-                {
+                while (SDL_PollEvent(&event)) {
                     if (event.type == SDL_QUIT ||
-                        (event.type == SDL_KEYDOWN && (event.key.keysym.sym == SDLK_q || event.key.keysym.sym == SDLK_ESCAPE))) {
+                        (event.type == SDL_KEYDOWN &&
+                         (event.key.keysym.sym == SDLK_q || event.key.keysym.sym == SDLK_ESCAPE))) {
                         running = false;
                     }
                 }
             }
 
-            const auto cycles_to_execute = 154*456*4;
-            for(int j=0; j<cycles_to_execute; j++) {
+            const auto cycles_to_execute = 154 * 456 * 4;
+            for (int j = 0; j < cycles_to_execute; j++) {
                 gb.do_tick();
             }
 
             const auto nprint = 10;
-            if((i++)%nprint == 0) {
-                auto toc = std::chrono::high_resolution_clock::now();
+            if ((i++) % nprint == 0) {
+                auto toc      = std::chrono::high_resolution_clock::now();
                 auto duration = std::chrono::duration_cast<std::chrono::microseconds>(toc - tic);
-                fmt::print("Emulation frequency (M-cycles): {} MHz\n", float(cycles_to_execute*nprint)/duration.count());
+                fmt::print("Emulation frequency (M-cycles): {} MHz\n",
+                           float(cycles_to_execute * nprint / 4) / duration.count());
                 tic = toc;
             }
 
-            if(!nowin) {
+            if (!nowin) {
                 // It's a good idea to clear the screen every frame,
                 // as artifacts may occur if the window overlaps with
                 // other windows or transparent overlays.
@@ -120,7 +122,7 @@ int main(int argc, char **argv) {
         res = 1;
     }
 
-    if(!nowin) {
+    if (!nowin) {
         SDL_Quit();
     }
 
