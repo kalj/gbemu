@@ -271,6 +271,19 @@ void Cpu::do_tick(uint64_t clock, Bus &bus, InterruptState &int_state) {
             this->cycle = 0; // start over
             break;
 
+        case 0x10: {
+            log(fmt::format("STOP\n"));
+            const auto nextbyte = bus.read(this->pc + 1);
+            if (nextbyte == 0x00) {
+                throw std::runtime_error(fmt::format("Proper STOP instruction encountered at ${:04X}", this->pc));
+            } else {
+                throw std::runtime_error(
+                    fmt::format("Incorrect STOP instruction encountered at ${:04X}, second byte: ${:02X}",
+                                this->pc,
+                                nextbyte));
+            }
+        } break;
+
         case 0x76: // halt
         {
             log(fmt::format("HALT\n"));
