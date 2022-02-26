@@ -176,16 +176,15 @@ void Gameboy::reset() {
 }
 
 void Gameboy::do_tick() {
-    if(this->ppu.dma_is_active()) {
-        this->ppu.tick_dma(bus);
-    }
+    this->ppu.tick_dma(this->clock, bus);
 
-    this->cpu.do_tick(this->bus, this->interrupt_state);
+    this->cpu.do_tick(this->clock, this->bus, this->interrupt_state);
 
-    for(int j=0; j<4; j++) {
-        // fmt::print(" === [PPU cycle = {}]\n", 4*i+j);
-        this->ppu.do_tick(this->pixel_buffer, this->bus, this->interrupt_state);
-    }
+    this->ppu.do_tick(this->pixel_buffer, this->bus, this->interrupt_state);
+
+    this->div_timer.do_tick(this->clock, this->interrupt_state);
+
+    this->clock++;
 }
 
 void Gameboy::dump(std::ostream &os) const {

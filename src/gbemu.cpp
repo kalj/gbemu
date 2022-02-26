@@ -92,10 +92,17 @@ int main(int argc, char **argv) {
                 }
             }
 
-            const auto cycles_to_execute = 154*456;
-            for(int j=0; j<cycles_to_execute; j++,i++) {
-                // log(fmt::format(" === [CPU cycle = {}]\n", i));
+            const auto cycles_to_execute = 154*456*4;
+            for(int j=0; j<cycles_to_execute; j++) {
                 gb.do_tick();
+            }
+
+            const auto nprint = 10;
+            if((i++)%nprint == 0) {
+                auto toc = std::chrono::high_resolution_clock::now();
+                auto duration = std::chrono::duration_cast<std::chrono::microseconds>(toc - tic);
+                fmt::print("Emulation frequency (M-cycles): {} MHz\n", float(cycles_to_execute*nprint)/duration.count());
+                tic = toc;
             }
 
             if(!nowin) {

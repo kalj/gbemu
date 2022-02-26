@@ -21,7 +21,7 @@ public:
     void do_tick(std::vector<uint32_t> &buf, const Bus &bus, InterruptState &int_state);
 
     bool dma_is_active() const;
-    void tick_dma(Bus &bus);
+    void tick_dma(uint64_t clock, Bus &bus);
 
     uint8_t read_reg(uint8_t regid) const;
     void write_reg(uint8_t regid, uint8_t data);

@@ -21,8 +21,8 @@ bool test_valid_rom(const std::vector<uint8_t> &rom) {
     Bus bus{CartridgeType::ROM_ONLY, rom, 0, cntl, comm, dt, snd, ppu, int_state};
 
     try {
-        for(size_t i=0; i<rom.size(); i++) {
-            cpu.do_tick(bus, int_state);
+        for(size_t i=0; i<4*rom.size(); i++) {
+            cpu.do_tick(i, bus, int_state);
         }
         return true;
     } catch(...) {

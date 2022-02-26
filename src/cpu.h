@@ -19,7 +19,7 @@ union reg {
 class Cpu {
 public:
     void reset();
-    void do_tick(Bus &bus, InterruptState &int_state);
+    void do_tick(uint64_t clock, Bus &bus, InterruptState &int_state);
     void dump(std::ostream &os) const;
 
 private:

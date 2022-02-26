@@ -212,7 +212,11 @@ void Cpu::rr(uint8_t &reg, bool with_z_flag) {
     this->flag_n      = false;
 }
 
-void Cpu::do_tick(Bus &bus, InterruptState &int_state) {
+void Cpu::do_tick(uint64_t clock, Bus &bus, InterruptState &int_state) {
+    if(clock%4 != 0) {
+        // divide the clock by 4 to get 1MiHz (2^20 Hz)
+        return;
+    }
 
     if (this->cycle == 0) {
         // check for interrupts:

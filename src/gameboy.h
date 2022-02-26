@@ -27,6 +27,7 @@ public:
     void do_tick();
     void dump(std::ostream &os) const;
 private:
+    uint64_t clock{0};
     CartridgeType cartridge_type;
     size_t cartridge_ram_size;
     std::vector<uint8_t> &rom;

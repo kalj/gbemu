@@ -138,7 +138,13 @@ bool Ppu::dma_is_active() const {
     return this->dma_n_bytes_left != 0;
 }
 
-void Ppu::tick_dma(Bus &bus) {
+void Ppu::tick_dma(uint64_t clock, Bus &bus) {
+
+    if(clock%4 != 0) {
+        // divide the clock by 4 to get 1MiHz (2^20 Hz)
+        return;
+    }
+
     if (this->dma_n_bytes_left == 0) {
         return;
     }
