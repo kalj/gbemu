@@ -22,6 +22,14 @@ public:
     void do_tick(uint64_t clock, Bus &bus, InterruptState &int_state);
     void dump(std::ostream &os) const;
 
+    bool is_halted() const {
+        return this->halted;
+    }
+
+    void unhalt() {
+        this->halted = false;
+    }
+
 private:
     void set_flags(bool z, bool n, bool h, bool c) {
         this->flag_z = z;
@@ -76,6 +84,7 @@ private:
     bool flag_c{false};
     bool ime{false};
 
+    bool halted{false};
     std::optional<InterruptCause> isr_active;
     int cycle{0};
     uint8_t opcode{0};

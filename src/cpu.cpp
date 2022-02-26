@@ -15,6 +15,7 @@ void Cpu::reset() {
     this->sp     = 0xfffe;
     this->pc     = 0x0100;
 
+    this->halted = false;
     this->cycle = 0;
     this->ime   = false;
 }
@@ -269,6 +270,14 @@ void Cpu::do_tick(uint64_t clock, Bus &bus, InterruptState &int_state) {
             this->pc += 1;
             this->cycle = 0; // start over
             break;
+
+        case 0x76: // halt
+        {
+            log(fmt::format("HALT\n"));
+            this->pc++;
+            this->halted = true;
+            log(fmt::format("\t\t\t\t\t\t\t\t\t Halting the CPU...\n"));
+        } break;
 
         case 0x27: { // BCD adjust A
             log(fmt::format("DAA\n"));

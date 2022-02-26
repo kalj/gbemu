@@ -176,11 +176,17 @@ void Gameboy::reset() {
 }
 
 void Gameboy::do_tick() {
-    this->ppu.tick_dma(this->clock, bus);
+    if(this->interrupt_state.get_interrupts()) {
+        this->cpu.unhalt();
+    }
 
-    this->cpu.do_tick(this->clock, this->bus, this->interrupt_state);
+    if(!this->cpu.is_halted()) {
+        this->ppu.tick_dma(this->clock, bus);
 
-    this->ppu.do_tick(this->pixel_buffer, this->bus, this->interrupt_state);
+        this->cpu.do_tick(this->clock, this->bus, this->interrupt_state);
+
+        this->ppu.do_tick(this->pixel_buffer, this->bus, this->interrupt_state);
+    }
 
     this->div_timer.do_tick(this->clock, this->interrupt_state);
 
