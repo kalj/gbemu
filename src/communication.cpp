@@ -30,6 +30,7 @@ void Communication::write_reg(uint8_t regid, uint8_t data) {
 }
 
 void Communication::dump(std::ostream &os) const {
-    os << fmt::format("SB [0xff01]: {:02X}\n", this->sb);
-    os << fmt::format("SC [0xff02]: {:02X}\n", this->sc);
+    os << fmt::format("Communication state:\n");
+    os << fmt::format("  SB [0xFF01]: {:02X}\n", this->sb);
+    os << fmt::format("  SC [0xFF02]: {:02X}\n", this->sc);
 }

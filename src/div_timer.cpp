@@ -58,8 +58,9 @@ void DivTimer::write_reg(uint8_t regid, uint8_t data) {
 }
 
 void DivTimer::dump(std::ostream &os) const {
-    os << fmt::format("DIV  [0xff04]: {:02X}\n", this->div);
-    os << fmt::format("TIMA [0xff05]: {:02X}\n", this->timer);
-    os << fmt::format("TMA  [0xff06]: {:02X}\n", this->timer_modulo);
-    os << fmt::format("TAC  [0xff07]: {:02X}\n", (this->timer_enable?0x04:0)|this->clock_select);
+    os << fmt::format("DivTimer state:\n");
+    os << fmt::format("  DIV  [0xFF04]: {:02X}\n", this->div);
+    os << fmt::format("  TIMA [0xFF05]: {:02X}\n", this->timer);
+    os << fmt::format("  TMA  [0xFF06]: {:02X}\n", this->timer_modulo);
+    os << fmt::format("  TAC  [0xFF07]: {:02X}\n", (this->timer_enable?0x04:0)|this->clock_select);
 }

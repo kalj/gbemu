@@ -105,5 +105,5 @@ void Sound::write_reg(uint8_t regid, uint8_t data) {
 }
 
 void Sound::dump(std::ostream &os) const {
-    os << fmt::format("blah...\n");
+    os << fmt::format("Sound not implemented...\n");
 }

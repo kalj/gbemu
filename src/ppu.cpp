@@ -7,18 +7,6 @@
 #include <fmt/core.h>
 #include <stdexcept>
 
-// LCDC: LCD Control                     (PPU RO)
-// STAT: LCD Status                      (Bits 0-2 RW, 3-6 RO)
-// SCY: Scroll Y                         (PPU RO)
-// SCX: Scroll X                         (PPU RO)
-// LY: LCD Y Coordinate                  (PPU RW)
-// LYC: LY Compare                       (PPU RO)
-// BGP:  BG Palette Data    (Non CGB)    (PPU RO)
-// OBP0: Obj Palette 0 Data (Non CGB)    (PPU RO)
-// OBP1: Obj Palette 1 Data (Non CGB)    (PPU RO)
-// WY: Window Y Position                 (PPU RO)
-// WX: Window X Position + 7             (PPU RO)
-
 #define LCDC_BG_WIN_ENABLE     0b00000001
 #define LCDC_OBJ_ENABLE        0b00000010
 #define LCDC_OBJ_SIZE          0b00000100
@@ -109,18 +97,19 @@ void Ppu::write_reg(uint8_t regid, uint8_t data) {
 }
 
 void Ppu::dump_regs(std::ostream &os) const {
-    os << fmt::format("LCDC [0xFF40] {:02X}\n", this->lcdc);
-    os << fmt::format("STAT [0xFF41] {:02X}\n", this->stat);
-    os << fmt::format("SCY  [0xFF42] {:02X}\n", this->scy);
-    os << fmt::format("SCX  [0xFF43] {:02X}\n", this->scx);
-    os << fmt::format("LY   [0xFF44] {:02X}\n", this->ly);
-    os << fmt::format("LYC  [0xFF45] {:02X}\n", this->lyc);
+    os << fmt::format("PPU state:\n");
+    os << fmt::format("  LCDC [0xFF40] {:02X}\n", this->lcdc);
+    os << fmt::format("  STAT [0xFF41] {:02X}\n", this->stat);
+    os << fmt::format("  SCY  [0xFF42] {:02X}\n", this->scy);
+    os << fmt::format("  SCX  [0xFF43] {:02X}\n", this->scx);
+    os << fmt::format("  LY   [0xFF44] {:02X}\n", this->ly);
+    os << fmt::format("  LYC  [0xFF45] {:02X}\n", this->lyc);
 
-    os << fmt::format("OBP  [0xFF47] {:02X}\n", this->bgp);
-    os << fmt::format("OBP0 [0xFF48] {:02X}\n", this->obp0);
-    os << fmt::format("OBP1 [0xFF49] {:02X}\n", this->obp1);
-    os << fmt::format("WY   [0xFF4A] {:02X}\n", this->wy);
-    os << fmt::format("WX   [0xFF4B] {:02X}\n", this->wx);
+    os << fmt::format("  BGP  [0xFF47] {:02X}\n", this->bgp);
+    os << fmt::format("  OBP0 [0xFF48] {:02X}\n", this->obp0);
+    os << fmt::format("  OBP1 [0xFF49] {:02X}\n", this->obp1);
+    os << fmt::format("  WY   [0xFF4A] {:02X}\n", this->wy);
+    os << fmt::format("  WX   [0xFF4B] {:02X}\n", this->wx);
 }
 
 void Ppu::dump_oam(std::ostream &os) const {
