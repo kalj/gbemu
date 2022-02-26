@@ -209,7 +209,7 @@ void Ppu::do_tick(std::vector<uint32_t> &buf, const Bus &bus, InterruptState &in
             int8_t object_row[10];
             int n_object_indices=0;
             // foreach object in oam, gather (up to) 10 relevant ones
-            const auto tile_height = this->lcdc&(1<<2) ? 16 : 8;
+            const auto tile_height = this->lcdc&LCDC_OBJ_SIZE ? 16 : 8;
             for(int i=0; i<40; i++) {
                 const auto ypos = this->oam[4*i];
 
@@ -222,9 +222,10 @@ void Ppu::do_tick(std::vector<uint32_t> &buf, const Bus &bus, InterruptState &in
 
             // background tilemap coordinate
             // background tile index
-            const uint8_t bgy = this->scx + this->ly; // wrapping ok
+            const uint8_t bgy = this->scy + this->ly; // wrapping ok
             const uint8_t bg_tm_iy = bgy / 8; // 0-31
             const uint8_t bg_td_iy = bgy % 8; // 0-7
+            const uint16_t tile_map_area_base_idx = (this->lcdc&LCDC_BG_TMAP_AREA)?0x9c00 : 0x9800;
 
             // do the drawing
             for(int i=0; i<LCD_WIDTH; i++) {
@@ -233,33 +234,34 @@ void Ppu::do_tick(std::vector<uint32_t> &buf, const Bus &bus, InterruptState &in
 
                 uint8_t value = 0;
 
-                if(this->lcdc&0x01) { // background / window enabled
+                if(this->lcdc&LCDC_BG_WIN_ENABLE) { // background / window enabled
                     // coordinate within the background tile map:
                     uint8_t bgx = this->scx + i; // wrapping ok
                     const uint8_t bg_tm_ix = bgx / 8; // 0-31
                     const uint8_t bg_td_ix = bgx % 8; // 0-7
 
-                    const uint16_t tile_map_area_base_idx = (this->lcdc&(1<<3))?0x9c00 : 0x9800;
                     uint8_t tile_idx = bus.read(tile_map_area_base_idx + 32 * bg_tm_iy + bg_tm_ix);
                     uint16_t tile_data_area_base_idx = 0x8000;
-                    if((this->lcdc & (1 << 4)) == 0) {
-                        tile_idx -= 128;
+                    if((this->lcdc & LCDC_BG_WIN_TDATA_AREA) == 0) {
+                        tile_idx += 128;
                         tile_data_area_base_idx = 0x8800;
                     }
 
-                    const auto tile_row_lsb = bus.read(tile_data_area_base_idx*16 + 2*bg_td_iy);
-                    const auto tile_row_msb = bus.read(tile_data_area_base_idx*16 + 2*bg_td_iy+1);
+                    const uint16_t tile_address = tile_data_area_base_idx + tile_idx*16;
+
+                    const auto tile_row_lsb = bus.read(tile_address + 2*bg_td_iy);
+                    const auto tile_row_msb = bus.read(tile_address + 2*bg_td_iy+1);
                     const auto color_id_lsb = (tile_row_lsb >>(7-bg_td_ix))&0x1;
                     const auto color_id_msb = (tile_row_msb >>(7-bg_td_ix))&0x1;
                     const uint8_t color_id = (color_id_msb<<1)|color_id_lsb;
 
-                    value = (this->bgp>>color_id)&0x3;
+                    value = (this->bgp>>(color_id<<1))&0x3;
 
-                    // if(this->lcdc&(1<<5)) { // window enabled
+                    // if(this->lcdc&LCDC_WIN_ENABLE) { // window enabled
                     // }
                 }
 
-                if(this->lcdc&(1<<1)) { // object/sprite enabled
+                if(this->lcdc&LCDC_OBJ_ENABLE) { // object/sprite enabled
                     // loop over objects until a non-transparent pixel value has been found,
                     // and save the object index along the way
 
