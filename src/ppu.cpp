@@ -20,6 +20,18 @@
 #define N_YBLANK          10
 #define N_SCANLINES_TOTAL (LCD_HEIGHT + N_YBLANK)
 
+void Ppu::reset() {
+    this->write_reg(0x40, 0x91); //   ; LCDC
+    this->write_reg(0x42, 0x00); //   ; SCY
+    this->write_reg(0x43, 0x00); //   ; SCX
+    this->write_reg(0x45, 0x00); //   ; LYC
+    this->write_reg(0x47, 0xFC); //   ; BGP
+    this->write_reg(0x48, 0xFF); //   ; OBP0
+    this->write_reg(0x49, 0xFF); //   ; OBP1
+    this->write_reg(0x4A, 0x00); //   ; WY
+    this->write_reg(0x4B, 0x00); //   ; WX
+}
+
 uint8_t Ppu::read_reg(uint8_t regid) const {
     switch (regid) {
         case 0x40:

@@ -6,6 +6,9 @@
 
 class Sound {
 public:
+
+    void reset();
+
     uint8_t read_reg(uint8_t regid) const;
     void write_reg(uint8_t regid, uint8_t data);
     void dump(std::ostream &os) const;

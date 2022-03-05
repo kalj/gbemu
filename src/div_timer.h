@@ -8,6 +8,7 @@ class InterruptState;
 
 class DivTimer {
 public:
+    void reset();
 
     void do_tick(uint64_t clock, InterruptState &int_state);
     uint8_t read_reg(uint8_t regid) const;

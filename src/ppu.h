@@ -19,6 +19,8 @@ public:
     Ppu() : oam(OAM_SIZE, 0) {
     }
 
+    void reset();
+
     void do_tick(std::vector<uint32_t> &buf, const IBus &bus, InterruptState &int_state);
 
     bool dma_is_active() const;

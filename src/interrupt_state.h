@@ -16,6 +16,8 @@ std::string interrupt_cause_to_string(InterruptCause ic);
 
 class InterruptState {
 public:
+    void reset();
+
     void set_if_bit(InterruptCause ic);
     void clear_if_bit(InterruptCause ic);
 

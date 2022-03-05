@@ -6,6 +6,12 @@
 
 const static std::array<uint16_t,4> divisors = { 1024, 16, 64, 256 };
 
+void DivTimer::reset() {
+    this->write_reg(0x05, 0x00); //   ; TIMA
+    this->write_reg(0x06, 0x00); //   ; TMA
+    this->write_reg(0x07, 0x00); //   ; TAC
+}
+
 void DivTimer::do_tick(uint64_t clock, InterruptState &int_state) {
     if(clock%256 == 0) {
         this->div++;

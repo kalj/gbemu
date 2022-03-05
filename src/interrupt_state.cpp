@@ -19,6 +19,10 @@ std::string interrupt_cause_to_string(InterruptCause ic) {
     throw std::runtime_error("Shouldn't ever end up here!");
 }
 
+void InterruptState::reset() {
+    this->write_reg(0xFF, 0x00); //   ; IE
+}
+
 void InterruptState::set_if_bit(InterruptCause ic) {
     this->if_reg |= 1<<static_cast<uint8_t>(ic);
 }
