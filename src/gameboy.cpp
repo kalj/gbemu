@@ -10,30 +10,30 @@ Gameboy::Gameboy(const std::vector<uint8_t> &rom_contents)
 
 void Gameboy::print_cartridge_info() const {
 
-    fmt::print("Title:             {}\n\n", this->cartridge.get_title());
+    fmt::print("Title:             {}\n", this->cartridge.get_title());
 
-    fmt::print("CGB flag:          ${:02X}\n\n", this->cartridge.get_cgb_flag());
+    fmt::print("CGB flag:          ${:02X}\n", this->cartridge.get_cgb_flag());
 
-    fmt::print("SGB flag:          ${:02X}\n\n", this->cartridge.get_sgb_flag());
+    fmt::print("SGB flag:          ${:02X}\n", this->cartridge.get_sgb_flag());
 
-    fmt::print("Cartridge type:    {}\n\n", this->cartridge.get_type_str());
+    fmt::print("Cartridge type:    {}\n", this->cartridge.get_type_str());
 
-    fmt::print("ROM size:          {} KiB, {} banks\n\n",
+    fmt::print("ROM size:          {} KiB, {} banks\n",
                this->cartridge.get_rom_size() / 1024,
                this->cartridge.get_rom_banks());
 
-    fmt::print("RAM size code:     {} KiB, {} banks\n\n",
+    fmt::print("RAM size code:     {} KiB, {} banks\n",
                this->cartridge.get_ram_size() / 1024,
                this->cartridge.get_ram_banks());
 
     const auto destination_code = this->cartridge.get_destination_code();
-    fmt::print("Destination code:  ${:02X} ({})\n\n",
+    fmt::print("Destination code:  ${:02X} ({})\n",
                destination_code,
                destination_code==0 ? "Japanese" : "Non-Japanese");
 
-    fmt::print("Licensee code:     {}\n\n", this->cartridge.get_licensee_code());
+    fmt::print("Licensee code:     {}\n", this->cartridge.get_licensee_code());
 
-    fmt::print("Mask ROM version:  ${:02X}\n\n", this->cartridge.get_mask_rom_version());
+    fmt::print("Mask ROM version:  ${:02X}\n", this->cartridge.get_mask_rom_version());
 }
 
 void Gameboy::reset() {
