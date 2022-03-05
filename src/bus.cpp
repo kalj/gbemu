@@ -192,7 +192,6 @@ void Bus::write(uint16_t addr, uint8_t data) {
             logging::warning(fmt::format("=====================================================================\n"));
             return;
         }
-    } else if(addr == 0xffff) {
     } else { // 0xff80 - 0xfffe
         desc = "HRAM";
         this->hram[addr-0xff80] = data;
