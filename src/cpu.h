@@ -1,11 +1,12 @@
 #ifndef CPU_H
 #define CPU_H
 
+#include "ibus.h"
+
 #include <cstdint>
 #include <optional>
 #include <string>
 
-class Bus;
 class InterruptState;
 enum class InterruptCause;
 
@@ -19,7 +20,7 @@ union reg {
 class Cpu {
 public:
     void reset();
-    void do_tick(uint64_t clock, Bus &bus, InterruptState &int_state);
+    void do_tick(uint64_t clock, IBus &bus, InterruptState &int_state);
     void dump(std::ostream &os) const;
 
     bool is_halted() const {

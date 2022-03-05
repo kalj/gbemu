@@ -1,24 +1,30 @@
 #include "logging.h"
-#include "gameboy.h"
-#include "ppu.h"
-#include "controller.h"
-#include "communication.h"
-#include "sound.h"
-#include "div_timer.h"
+#include "cpu.h"
 #include "interrupt_state.h"
 #include "bus.h"
 
 #include <fmt/core.h>
 
+class MockBus : public IBus {
+public:
+    MockBus(const std::vector<uint8_t> &rom) : rom(rom) {}
+
+    uint8_t read(uint16_t addr) const override {
+        return rom[addr];
+    }
+
+    void write(uint16_t addr, uint8_t data) override {
+        // do nothing
+    }
+
+private:
+    const std::vector<uint8_t> &rom;
+};
+
 bool test_valid_rom(const std::vector<uint8_t> &rom) {
     Cpu cpu;
-    Sound snd;
-    Controller cntl;
-    Communication comm;
-    DivTimer dt;
     InterruptState int_state;
-    Ppu ppu;
-    Bus bus{CartridgeType::ROM_ONLY, rom, 0, cntl, comm, dt, snd, ppu, int_state};
+    MockBus bus{rom};
 
     try {
         for(size_t i=0; i<4*rom.size(); i++) {

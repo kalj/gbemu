@@ -1,6 +1,8 @@
 #ifndef PPU_H
 #define PPU_H
 
+#include "ibus.h"
+
 #include <cstdint>
 #include <iosfwd>
 #include <vector>
@@ -10,7 +12,6 @@
 
 #define OAM_SIZE 160
 
-class Bus;
 class InterruptState;
 
 class Ppu {
@@ -18,10 +19,10 @@ public:
     Ppu() : oam(OAM_SIZE, 0) {
     }
 
-    void do_tick(std::vector<uint32_t> &buf, const Bus &bus, InterruptState &int_state);
+    void do_tick(std::vector<uint32_t> &buf, const IBus &bus, InterruptState &int_state);
 
     bool dma_is_active() const;
-    void tick_dma(uint64_t clock, Bus &bus);
+    void tick_dma(uint64_t clock, IBus &bus);
 
     uint8_t read_reg(uint8_t regid) const;
     void write_reg(uint8_t regid, uint8_t data);

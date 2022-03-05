@@ -1,6 +1,5 @@
 #include "ppu.h"
 
-#include "bus.h"
 #include "interrupt_state.h"
 #include "logging.h"
 
@@ -127,7 +126,7 @@ bool Ppu::dma_is_active() const {
     return this->dma_n_bytes_left != 0;
 }
 
-void Ppu::tick_dma(uint64_t clock, Bus &bus) {
+void Ppu::tick_dma(uint64_t clock, IBus &bus) {
 
     if(clock%4 != 0) {
         // divide the clock by 4 to get 1MiHz (2^20 Hz)
@@ -150,7 +149,7 @@ void Ppu::tick_dma(uint64_t clock, Bus &bus) {
 
 //  Mode cycle: 22 333 00  22 333 00 .. 111111
 
-void Ppu::do_tick(std::vector<uint32_t> &buf, const Bus &bus, InterruptState &int_state) {
+void Ppu::do_tick(std::vector<uint32_t> &buf, const IBus &bus, InterruptState &int_state) {
 
     if((this->lcdc & LCDC_LCD_ENABLE) == 0) {
         // lcd / ppu disabled

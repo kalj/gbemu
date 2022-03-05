@@ -1,6 +1,8 @@
 #ifndef BUS_H
 #define BUS_H
 
+#include "ibus.h"
+
 #include <string>
 #include <vector>
 
@@ -42,7 +44,7 @@ class DivTimer;
 class Sound;
 class Communication;
 
-class Bus {
+class Bus : public IBus {
 public:
     Bus(CartridgeType type,
         const std::vector<uint8_t> &cartridge_rom,
@@ -54,8 +56,8 @@ public:
         Ppu &ppu,
         InterruptState &is);
 
-    uint8_t read(uint16_t addr) const;
-    void write(uint16_t addr, uint8_t data);
+    uint8_t read(uint16_t addr) const override;
+    void write(uint16_t addr, uint8_t data) override;
     void dump(std::ostream &os) const;
 
 private:
