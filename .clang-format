@@ -30,6 +30,8 @@ IndentWidth: 4
 ReflowComments: false
 SpacesBeforeTrailingComments: 1
 
+NamespaceIndentation: All
+
 ---
 Language: Proto
 AlignConsecutiveAssignments : true
