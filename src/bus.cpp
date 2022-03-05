@@ -6,86 +6,23 @@
 #include "controller.h"
 #include "div_timer.h"
 #include "interrupt_state.h"
+#include "cartridge.h"
 
 #include "logging.h"
 
 #include <fmt/core.h>
 
-std::string to_string(CartridgeType t) {
-    using enum CartridgeType;
-    switch (t) {
-        case ROM_ONLY:
-            return "ROM_ONLY";
-        case ROM_MBC1:
-            return "ROM_MBC1";
-        case ROM_MBC1_RAM:
-            return "ROM_MBC1_RAM";
-        case ROM_MBC1_RAM_BATT:
-            return "ROM_MBC1_RAM_BATT";
-        case ROM_MBC2:
-            return "ROM_MBC2";
-        case ROM_MBC2_BATT:
-            return "ROM_MBC2_BATT";
-        case ROM_RAM:
-            return "ROM_RAM";
-        case ROM_RAM_BATT:
-            return "ROM_RAM_BATT";
-        case ROM_MMM01:
-            return "ROM_MMM01";
-        case ROM_MMM01_SRAM:
-            return "ROM_MMM01_SRAM";
-        case ROM_MMM01_SRAM_BATT:
-            return "ROM_MMM01_SRAM_BATT";
-        case ROM_MBC3_TIMER_BATT:
-            return "ROM_MBC3_TIMER_BATT";
-        case ROM_MBC3_TIMER_RAM_BATT:
-            return "ROM_MBC3_TIMER_RAM_BATT";
-        case ROM_MBC3:
-            return "ROM_MBC3";
-        case ROM_MBC3_RAM_:
-            return "ROM_MBC3_RAM_";
-        case ROM_MBC3_RAM_BATT:
-            return "ROM_MBC3_RAM_BATT";
-        case ROM_MBC5:
-            return "ROM_MBC5";
-        case ROM_MBC5_RAM_:
-            return "ROM_MBC5_RAM_";
-        case ROM_MBC5_RAM_BATT:
-            return "ROM_MBC5_RAM_BATT";
-        case ROM_MBC5_RUMBLE:
-            return "ROM_MBC5_RUMBLE";
-        case ROM_MBC5_RUMBLE_RAM:
-            return "ROM_MBC5_RUMBLE_RAM";
-        case ROM_MBC5_RUMBLE_RAM_BATT:
-            return "ROM_MBC5_RUMBLE_RAM_BATT";
-        case POCKET_CAMERA:
-            return "POCKET_CAMERA";
-        case BANDAI_TAMA5:
-            return "BANDAI_TAMA5";
-        case HUDSON_HUC3:
-            return "HUDSON_HUC3";
-        case HUDSON_HUC1:
-            return "HUDSON_HUC1";
-        default:
-            return "INVALID";
-    }
-}
-
-Bus::Bus(CartridgeType type,
-         const std::vector<uint8_t> &cartridge_rom,
-         uint32_t ram_size,
+Bus::Bus(Cartridge &cart,
          Controller &cntl,
          Communication &comm,
          DivTimer &dt,
          Sound &snd,
          Ppu &ppu,
          InterruptState &is)
-    : cartridge_type(type),
-      rom(cartridge_rom),
-      vram(8 * 1024, 0xff),
-      cram(ram_size, 0xff),
+    : vram(8 * 1024, 0xff),
       wram(8 * 1024, 0xff),
       hram(127, 0xff),
+      cartridge(cart),
       controller(cntl),
       communication(comm),
       div_timer(dt),
@@ -98,12 +35,13 @@ uint8_t Bus::read(uint16_t addr) const {
     std::string desc = "";
     if(addr < 0x8000) {
         desc = "ROM";
-        data = this->rom[addr];
+        data = this->cartridge.read_rom(addr);
     } else if(addr < 0xa000) {
         desc = "VRAM";
         data = this->vram[addr-0x8000];
     } else if(addr < 0xc000) {
-        throw std::runtime_error(fmt::format("INVALID BUS READ AT ${:04X} (external RAM)", addr));
+        desc = "Cartridge RAM";
+        data = this->cartridge.read_ram(addr-0xa000);
     } else if(addr < 0xe000) {
         desc = "WRAM";
         data = this->wram[addr-0xc000];
@@ -147,15 +85,13 @@ uint8_t Bus::read(uint16_t addr) const {
 void Bus::write(uint16_t addr, uint8_t data) {
     std::string desc = "";
     if(addr < 0x8000) {
-        logging::warning(fmt::format("=========================================================\n"));
-        logging::warning(fmt::format("   WARNING: INVALID BUS WRITE AT ${:04X} (ROM), data=${:02X}\n", addr, data));
-        logging::warning(fmt::format("=========================================================\n"));
-        return;
+        desc = "MBC";
+        this->cartridge.write_mbc(addr, data);
     } else if(addr < 0xa000) {
         desc = "VRAM";
         this->vram[addr-0x8000] = data;
     } else if(addr < 0xc000) {
-        throw std::runtime_error(fmt::format("INVALID BUS WRITE AT ${:04X} (external RAM), data=${:02X}", addr, data));
+        this->cartridge.write_ram(addr-0xa000, data);
     } else if(addr < 0xe000) {
         desc = "WRAM";
         this->wram[addr-0xc000] = data;
@@ -201,15 +137,8 @@ void Bus::write(uint16_t addr, uint8_t data) {
 
 void Bus::dump(std::ostream &os) const {
 
-    os << "\nROM:";
-    for(size_t i=0; i<this->rom.size(); i++) {
-        const uint16_t a = i+0;
-        if(a%16 == 0) {
-            os << fmt::format("\n${:04X}:", a);
-        }
-
-        os << fmt::format(" {:02X}", this->rom[i]);
-    }
+    os << "\nROM:\n";
+    this->cartridge.dump_rom(os);
 
     os << "\nVRAM:";
     for(uint16_t i=0; i<this->vram.size(); i++) {

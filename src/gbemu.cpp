@@ -41,7 +41,7 @@ int main(int argc, char **argv) {
     Gameboy gb{cartridge_rom_contents};
     gb.reset();
 
-    gb.print_header();
+    gb.print_cartridge_info();
 
     SDL_Window *window          = NULL;
     SDL_Renderer *renderer      = NULL;

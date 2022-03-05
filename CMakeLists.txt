@@ -30,6 +30,7 @@ add_library(common_objects OBJECT
   src/sound.cpp
   src/ppu.cpp
   src/interrupt_state.cpp
+  src/cartridge.cpp
   src/logging.cpp
   )
 
