@@ -1,5 +1,5 @@
 #include "gameboy.h"
-#include "log.h"
+#include "logging.h"
 
 #include <fmt/core.h>
 #include <chrono>
@@ -36,9 +36,7 @@ int main(int argc, char **argv) {
 
     std::vector<uint8_t> cartridge_rom_contents(std::istreambuf_iterator<char>(infile), {});
 
-    if (verbose) {
-        log_set_enable(true);
-    }
+    logging::set_level(verbose ? logging::LogLevel::DEBUG: logging::LogLevel::WARNING);
 
     Gameboy gb{cartridge_rom_contents};
     gb.reset();

@@ -7,7 +7,7 @@
 #include "div_timer.h"
 #include "interrupt_state.h"
 
-#include "log.h"
+#include "logging.h"
 
 #include <fmt/core.h>
 
@@ -132,22 +132,24 @@ uint8_t Bus::read(uint16_t addr) const {
         } else if(regid >= 0x40 && regid <= 0x4b) {
             data = this->ppu.read_reg(regid);
         } else {
-            throw std::runtime_error(fmt::format("INVALID IO REGISTER READ AT ${:04X}", addr));
+            logging::warning(fmt::format("=====================================================================\n"));
+            logging::warning(fmt::format("   WARNING: INVALID IO REGISTER READ AT ${:04X}\n", addr));
+            logging::warning(fmt::format("=====================================================================\n"));
         }
     } else { // 0xff80 - 0xfffe
         desc = "HRAM";
         data = this->hram[addr-0xff80];
     }
-    log(fmt::format("        BUS [${:04X}] -> ${:02X} ({})\n", addr, data, desc));
+    logging::debug(fmt::format("        BUS [${:04X}] -> ${:02X} ({})\n", addr, data, desc));
     return data;
 }
 
 void Bus::write(uint16_t addr, uint8_t data) {
     std::string desc = "";
     if(addr < 0x8000) {
-        log(fmt::format("=========================================================\n"));
-        log(fmt::format("   WARNING: INVALID BUS WRITE AT ${:04X} (ROM), data=${:02X}\n", addr, data));
-        log(fmt::format("=========================================================\n"));
+        logging::warning(fmt::format("=========================================================\n"));
+        logging::warning(fmt::format("   WARNING: INVALID BUS WRITE AT ${:04X} (ROM), data=${:02X}\n", addr, data));
+        logging::warning(fmt::format("=========================================================\n"));
         return;
     } else if(addr < 0xa000) {
         desc = "VRAM";
@@ -164,9 +166,9 @@ void Bus::write(uint16_t addr, uint8_t data) {
         desc = "OAM";
         this->ppu.write_oam(addr-0xfe00,data);
     } else if(addr < 0xff00) {
-        log(fmt::format("=====================================================================\n"));
-        log(fmt::format("   WARNING: INVALID BUS WRITE AT ${:04X} (prohibited area), data=${:02X}\n", addr, data));
-        log(fmt::format("=====================================================================\n"));
+        logging::warning(fmt::format("=====================================================================\n"));
+        logging::warning(fmt::format("   WARNING: INVALID BUS WRITE AT ${:04X} (prohibited area), data=${:02X}\n", addr, data));
+        logging::warning(fmt::format("=====================================================================\n"));
         return;
     } else if(addr == 0xff0f || addr == 0xffff) {
         desc = "InterruptState";
@@ -185,9 +187,9 @@ void Bus::write(uint16_t addr, uint8_t data) {
         } else if(regid >= 0x40 && regid <= 0x4b) {
             this->ppu.write_reg(regid, data);
         } else {
-            log(fmt::format("=====================================================================\n"));
-            log(fmt::format("   WARNING: INVALID IO REGISTER WRITE AT ${:04X} data=${:02X}\n", addr, data));
-            log(fmt::format("=====================================================================\n"));
+            logging::warning(fmt::format("=====================================================================\n"));
+            logging::warning(fmt::format("   WARNING: INVALID IO REGISTER WRITE AT ${:04X} data=${:02X}\n", addr, data));
+            logging::warning(fmt::format("=====================================================================\n"));
             return;
         }
     } else if(addr == 0xffff) {
@@ -195,7 +197,7 @@ void Bus::write(uint16_t addr, uint8_t data) {
         desc = "HRAM";
         this->hram[addr-0xff80] = data;
     }
-    log(fmt::format("        BUS [${:04X}] <- ${:02X}  ({})\n", addr, data, desc));
+    logging::debug(fmt::format("        BUS [${:04X}] <- ${:02X}  ({})\n", addr, data, desc));
 }
 
 void Bus::dump(std::ostream &os) const {

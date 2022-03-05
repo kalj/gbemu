@@ -30,7 +30,7 @@ add_library(common_objects OBJECT
   src/sound.cpp
   src/ppu.cpp
   src/interrupt_state.cpp
-  src/log.cpp
+  src/logging.cpp
   )
 
 include(FetchContent)

@@ -1,4 +1,4 @@
-#include "log.h"
+#include "logging.h"
 #include "gameboy.h"
 #include "ppu.h"
 #include "controller.h"
@@ -67,7 +67,7 @@ void print_matrix(const std::vector<bool> &results) {
 }
 
 int main() {
-    log_set_enable(false);
+    logging::set_level(logging::LogLevel::QUIET);
 
     std::vector<bool> results(256);
     for(int i=0; i<256; i++) {
