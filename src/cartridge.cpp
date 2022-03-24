@@ -254,10 +254,11 @@ void Cartridge::write_mbc(uint16_t addr, uint8_t data) {
                                          to_string(this->type)));
             break;
         case ROM_MBC1:
+        case ROM_MBC1_RAM:
+        case ROM_MBC1_RAM_BATT:
             if (addr >= 0x2000 || addr < 0x4000) {
                 const auto actual_bank = data & 0x1f;
                 this->bank             = actual_bank == 0 ? 1 : actual_bank;
-                fmt::print("Switching to bank {}\n", this->bank);
             }
             break;
         default:
