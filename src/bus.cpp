@@ -137,8 +137,8 @@ void Bus::write(uint16_t addr, uint8_t data) {
 
 void Bus::dump(std::ostream &os) const {
 
-    os << "\nROM:\n";
-    this->cartridge.dump_rom(os);
+    os << "\nCartridge RAM:\n";
+    this->cartridge.dump_ram(os);
 
     os << "\nVRAM:";
     for(uint16_t i=0; i<this->vram.size(); i++) {

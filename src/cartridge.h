@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <string>
 #include <vector>
+#include <memory>
 
 enum class CartridgeType : uint8_t {
     ROM_ONLY                 = 0x0,
@@ -34,9 +35,12 @@ enum class CartridgeType : uint8_t {
     HUDSON_HUC1              = 0xff,
 };
 
+class Mbc;
+
 class Cartridge {
 public:
     Cartridge(const std::vector<uint8_t> &cartridge_rom);
+    ~Cartridge();
 
     // getters
     int get_ram_size() const;
@@ -57,13 +61,13 @@ public:
     uint8_t read_ram(uint16_t addr) const;
     void write_ram(uint16_t addr, uint8_t data);
 
-    void dump_rom(std::ostream &os);
+    void dump_ram(std::ostream &os);
 
 private:
+    std::unique_ptr<Mbc> mbc;
     const std::vector<uint8_t> &rom;
     CartridgeType type{CartridgeType::ROM_ONLY};
     std::vector<uint8_t> ram;
-    uint8_t bank{1};
 };
 
 #endif /* CARTRIDGE_H */

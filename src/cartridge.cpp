@@ -4,6 +4,39 @@
 
 #include <fmt/core.h>
 
+class Mbc {
+public:
+    virtual ~Mbc()                                            = default;
+    virtual void write_mbc(uint16_t addr, uint8_t data)       = 0;
+    virtual size_t translate_rom_address(uint16_t addr) const = 0;
+    virtual uint8_t read_ram(uint16_t addr) const             = 0;
+    virtual void write_ram(uint16_t addr, uint8_t data)       = 0;
+};
+
+class NullMbc : public Mbc {
+public:
+    void write_mbc(uint16_t addr, uint8_t data) override {
+        // throw std::runtime_error(fmt::format("Invalid write to MBC of ${:02X} at ${:04X} for cartridge type ${:02X} ({})", data, addr, this->type, to_string(this->type)));
+        logging::warning(fmt::format("Invalid write to NullMc of ${:02X} at ${:04X}", data, addr));
+    }
+
+    size_t translate_rom_address(uint16_t addr) const override {
+        if (addr < 0x8000) {
+            return addr;
+        } else {
+            throw std::runtime_error(fmt::format("Invalid address passed to Cartridge::read_rom: ${:04X}", addr));
+        }
+    }
+
+    uint8_t read_ram(uint16_t addr) const override {
+        return 0xff;
+    }
+
+    void write_ram(uint16_t addr, uint8_t data) override {
+    }
+};
+
+
 static uint32_t rom_size_from_code(uint8_t code) {
     switch (code) {
         case 0:
@@ -158,6 +191,16 @@ Cartridge::Cartridge(const std::vector<uint8_t> &rom_bytes)
                    global_checksum_expected);
     }
 
+    // initialize mbc
+    switch (this->type) {
+        case CartridgeType::ROM_ONLY:
+            this->mbc = std::make_unique<NullMbc>();
+            break;
+        default:
+            throw std::runtime_error(
+                fmt::format("Mbc not implemented for cartridge type ${:02X} ({})", this->type, to_string(this->type)));
+    }
+
     switch (this->type) {
         case CartridgeType::ROM_ONLY:
         case CartridgeType::ROM_MBC1:
@@ -176,6 +219,9 @@ Cartridge::Cartridge(const std::vector<uint8_t> &rom_bytes)
         default:
             break;
     }
+}
+
+Cartridge::~Cartridge() {
 }
 
 int Cartridge::get_ram_size() const {
@@ -230,45 +276,12 @@ std::string Cartridge::get_licensee_code() const {
 
 // bus operations
 
-uint8_t Cartridge::read_rom(uint16_t addr) const {
-    if (addr < 0x4000) {
-        return this->rom[addr];
-    } else if (addr < 0x8000) {
-        const uint32_t actual_address = addr + uint32_t(0x4000) * (this->bank - 1);
-        return this->rom[actual_address];
-    } else {
-        throw std::runtime_error(fmt::format("Invalid address passed to Cartridge::read_rom: ${:04X}", addr));
-    }
+void Cartridge::write_mbc(uint16_t addr, uint8_t data) {
+    this->mbc->write_mbc(addr, data);
 }
 
-void Cartridge::write_mbc(uint16_t addr, uint8_t data) {
-
-    using enum CartridgeType;
-    switch (this->type) {
-        case ROM_ONLY:
-            // throw std::runtime_error(fmt::format("Invalid write to MBC of ${:02X} at ${:04X} for cartridge type ${:02X} ({})", data, addr, this->type, to_string(this->type)));
-            logging::warning(fmt::format("Invalid write to MBC of ${:02X} at ${:04X} for cartridge type ${:02X} ({})",
-                                         data,
-                                         addr,
-                                         this->type,
-                                         to_string(this->type)));
-            break;
-        case ROM_MBC1:
-        case ROM_MBC1_RAM:
-        case ROM_MBC1_RAM_BATT:
-            if (addr >= 0x2000 || addr < 0x4000) {
-                const auto actual_bank = data & 0x1f;
-                this->bank             = actual_bank == 0 ? 1 : actual_bank;
-            }
-            break;
-        default:
-            throw std::runtime_error(
-                fmt::format("write_mbc not implemented for cartridge type ${:02X} ({}), input: ${:04X}, ${:02X}",
-                            this->type,
-                            to_string(this->type),
-                            addr,
-                            data));
-    }
+uint8_t Cartridge::read_rom(uint16_t addr) const {
+    return this->rom[this->mbc->translate_rom_address(addr)];
 }
 
 uint8_t Cartridge::read_ram(uint16_t addr) const {
@@ -279,13 +292,13 @@ void Cartridge::write_ram(uint16_t addr, uint8_t data) {
     throw std::runtime_error(fmt::format("write_ram not implemented (input: ${:04X}, ${:02X})", addr, data));
 }
 
-void Cartridge::dump_rom(std::ostream &os) {
-    for (size_t i = 0; i < this->rom.size(); i++) {
+void Cartridge::dump_ram(std::ostream &os) {
+    for (size_t i = 0; i < this->ram.size(); i++) {
         const uint16_t a = i + 0;
         if (a % 16 == 0) {
             os << fmt::format("\n${:04X}:", a);
         }
 
-        os << fmt::format(" {:02X}", this->rom[i]);
+        os << fmt::format(" {:02X}", this->ram[i]);
     }
 }
