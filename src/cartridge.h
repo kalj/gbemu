@@ -21,7 +21,7 @@ enum class CartridgeType : uint8_t {
     ROM_MBC3_TIMER_BATT      = 0xf,
     ROM_MBC3_TIMER_RAM_BATT  = 0x10,
     ROM_MBC3                 = 0x11,
-    ROM_MBC3_RAM_            = 0x12,
+    ROM_MBC3_RAM             = 0x12,
     ROM_MBC3_RAM_BATT        = 0x13,
     ROM_MBC5                 = 0x19,
     ROM_MBC5_RAM_            = 0x1a,
