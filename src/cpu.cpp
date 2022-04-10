@@ -1807,7 +1807,7 @@ void Cpu::do_tick(uint64_t clock, IBus &bus, InterruptState &int_state) {
                     } else if (this->cycle == 2) {
                         const auto bit = (this->tmp1 >> 3) & 0x7;
                         const auto &op = bus.read(this->hl.r16);
-                        this->flag_z   = op & (1 << bit);
+                        this->flag_z   = !(op & (1 << bit));
                         this->flag_n   = false;
                         this->flag_h   = true;
 
@@ -1825,7 +1825,7 @@ void Cpu::do_tick(uint64_t clock, IBus &bus, InterruptState &int_state) {
 
                         logging::debug(fmt::format("BIT {}, {}\n", bit, reg_name));
                         const auto &reg = decode_reg8(this->tmp1 & 0x7);
-                        this->flag_z    = reg & (1 << bit);
+                        this->flag_z    = !(reg & (1 << bit));
                         this->flag_n    = false;
                         this->flag_h    = true;
 
