@@ -178,20 +178,22 @@ uint8_t Cpu::get_dec(uint8_t oldval) {
     return newval;
 }
 
-void Cpu::rlc(uint8_t &reg, bool with_z_flag) {
-    this->flag_c = reg & 0x80;                       // bit 7 goes into carry
-    reg          = (reg << 1) | ((reg & 0x80) >> 7); // rotate left without carry
-    this->flag_h = false;
-    this->flag_n = false;
-    this->flag_z = with_z_flag && reg == 0;
+uint8_t Cpu::rlc(uint8_t oldval, bool with_z_flag) {
+    this->flag_c      = oldval & 0x80;                          // bit 7 goes into carry
+    const uint8_t res = (oldval << 1) | ((oldval & 0x80) >> 7); // rotate left without carry
+    this->flag_h      = false;
+    this->flag_n      = false;
+    this->flag_z      = with_z_flag && res == 0;
+    return res;
 }
 
-void Cpu::rrc(uint8_t &reg, bool with_z_flag) {
-    this->flag_c = reg & 0x01;                       // bit 0 goes into carry
-    reg          = ((reg & 0x01) << 7) | (reg >> 1); // rotate right without carry
-    this->flag_z = with_z_flag && reg == 0;
-    this->flag_h = false;
-    this->flag_n = false;
+uint8_t Cpu::rrc(uint8_t oldval, bool with_z_flag) {
+    this->flag_c      = oldval & 0x01;                          // bit 0 goes into carry
+    const uint8_t res = ((oldval & 0x01) << 7) | (oldval >> 1); // rotate right without carry
+    this->flag_z      = with_z_flag && res == 0;
+    this->flag_h      = false;
+    this->flag_n      = false;
+    return res;
 }
 
 void Cpu::rl(uint8_t &reg, bool with_z_flag) {
@@ -837,7 +839,7 @@ void Cpu::do_tick(uint64_t clock, IBus &bus, InterruptState &int_state) {
         case 0x07: // RLCA
         {
             logging::debug(fmt::format("RLCA\n"));
-            this->rlc(this->a, false);
+            this->a = this->rlc(this->a, false);
 
             logging::debug(fmt::format("\t\t\t\t\t\t\t\t\t 8-bit rotate left of A = ${:02X}\n", this->a));
             this->pc += 1;
@@ -845,7 +847,7 @@ void Cpu::do_tick(uint64_t clock, IBus &bus, InterruptState &int_state) {
         case 0x0F: // RRCA
         {
             logging::debug(fmt::format("RRCA\n"));
-            this->rrc(this->a, false);
+            this->a = this->rrc(this->a, false);
 
             logging::debug(fmt::format("\t\t\t\t\t\t\t\t\t 8-bit rotate right of A = ${:02X}\n", this->a));
             this->pc += 1;
@@ -1602,15 +1604,25 @@ void Cpu::do_tick(uint64_t clock, IBus &bus, InterruptState &int_state) {
 
             if ((this->tmp1 & 0b11111000) == 0b00000000) { // RLC
                 if ((this->tmp1 & 0x7) == 0x06) {          // RLC (HL)
-                    logging::debug(fmt::format("???\n"));
-                    throw std::runtime_error(
-                        fmt::format("UNKNOWN EXTENDED OPCODE ${:02X} at PC=${:04X}", this->tmp1, this->pc));
+                    if (this->cycle == 1) {
+                        logging::debug(fmt::format("RLC (HL)\n"));
+                        this->cycle++;
+                    } else if (this->cycle == 2) {
+                        this->tmp2 = bus.read(this->hl.r16);
+                        this->cycle++;
+                    } else if (this->cycle == 3) {
+                        const uint8_t newval = this->rlc(this->tmp2, true);
+                        bus.write(this->hl.r16, newval);
+                        logging::debug(fmt::format("\t\t\t\t\t\t\t\t\t 8-bit rotate left of (HL) (${:04X}) = ${:02X}\n", this->hl.r16, newval));
+                        this->pc += 2;
+                        this->cycle = 0;
+                    }
                 } else {
                     if (this->cycle == 1) {
                         const auto reg_name = decode_reg8_name(this->tmp1 & 0x7);
                         logging::debug(fmt::format("RLC {}\n", reg_name));
                         auto &reg = decode_reg8(this->tmp1 & 0x7);
-                        this->rlc(reg, true);
+                        reg = this->rlc(reg, true);
 
                         logging::debug(fmt::format("\t\t\t\t\t\t\t\t\t 8-bit rotate left of {} = ${:02X}\n", reg_name, reg));
                         this->pc += 2;
@@ -1619,15 +1631,25 @@ void Cpu::do_tick(uint64_t clock, IBus &bus, InterruptState &int_state) {
                 }
             } else if ((this->tmp1 & 0b11111000) == 0b00001000) { // RRC
                 if ((this->tmp1 & 0x7) == 0x06) {                 // RRC (HL)
-                    logging::debug(fmt::format("???\n"));
-                    throw std::runtime_error(
-                        fmt::format("UNKNOWN EXTENDED OPCODE ${:02X} at PC=${:04X}", this->tmp1, this->pc));
+                    if (this->cycle == 1) {
+                        logging::debug(fmt::format("RRC (HL)\n"));
+                        this->cycle++;
+                    } else if (this->cycle == 2) {
+                        this->tmp2 = bus.read(this->hl.r16);
+                        this->cycle++;
+                    } else if (this->cycle == 3) {
+                        const uint8_t newval = this->rrc(this->tmp2, true);
+                        bus.write(this->hl.r16, newval);
+                        logging::debug(fmt::format("\t\t\t\t\t\t\t\t\t 8-bit rotate right of (HL) (${:04X}) = ${:02X}\n", this->hl.r16, newval));
+                        this->pc += 2;
+                        this->cycle = 0;
+                    }
                 } else {
                     if (this->cycle == 1) {
                         const auto reg_name = decode_reg8_name(this->tmp1 & 0x7);
                         logging::debug(fmt::format("RRC {}\n", reg_name));
                         auto &reg = decode_reg8(this->tmp1 & 0x7);
-                        this->rrc(reg, true);
+                        reg = this->rrc(reg, true);
 
                         logging::debug(fmt::format("\t\t\t\t\t\t\t\t\t 8-bit rotate right of {} = ${:02X}\n", reg_name, reg));
                         this->pc += 2;

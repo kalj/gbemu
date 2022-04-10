@@ -67,8 +67,8 @@ private:
     uint8_t get_inc(uint8_t oldval);
     uint8_t get_dec(uint8_t oldval);
 
-    void rlc(uint8_t &reg, bool with_z_flag);
-    void rrc(uint8_t &reg, bool with_z_flag);
+    uint8_t rlc(uint8_t oldval, bool with_z_flag);
+    uint8_t rrc(uint8_t oldval, bool with_z_flag);
     void rl(uint8_t &reg, bool with_z_flag);
     void rr(uint8_t &reg, bool with_z_flag);
 
