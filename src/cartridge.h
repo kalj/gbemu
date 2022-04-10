@@ -2,9 +2,9 @@
 #define CARTRIDGE_H
 
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <vector>
-#include <memory>
 
 enum class CartridgeType : uint8_t {
     ROM_ONLY                 = 0x0,
@@ -34,6 +34,8 @@ enum class CartridgeType : uint8_t {
     HUDSON_HUC3              = 0xfe,
     HUDSON_HUC1              = 0xff,
 };
+
+std::string to_string(CartridgeType t);
 
 class Mbc;
 

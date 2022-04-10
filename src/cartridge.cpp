@@ -4,39 +4,6 @@
 
 #include <fmt/core.h>
 
-class Mbc {
-public:
-    virtual ~Mbc()                                            = default;
-    virtual void write_mbc(uint16_t addr, uint8_t data)       = 0;
-    virtual size_t translate_rom_address(uint16_t addr) const = 0;
-    virtual uint8_t read_ram(uint16_t addr) const             = 0;
-    virtual void write_ram(uint16_t addr, uint8_t data)       = 0;
-};
-
-class NullMbc : public Mbc {
-public:
-    void write_mbc(uint16_t addr, uint8_t data) override {
-        // throw std::runtime_error(fmt::format("Invalid write to MBC of ${:02X} at ${:04X} for cartridge type ${:02X} ({})", data, addr, this->type, to_string(this->type)));
-        logging::warning(fmt::format("Invalid write to NullMc of ${:02X} at ${:04X}", data, addr));
-    }
-
-    size_t translate_rom_address(uint16_t addr) const override {
-        if (addr < 0x8000) {
-            return addr;
-        } else {
-            throw std::runtime_error(fmt::format("Invalid address passed to Cartridge::read_rom: ${:04X}", addr));
-        }
-    }
-
-    uint8_t read_ram(uint16_t addr) const override {
-        return 0xff;
-    }
-
-    void write_ram(uint16_t addr, uint8_t data) override {
-    }
-};
-
-
 static uint32_t rom_size_from_code(uint8_t code) {
     switch (code) {
         case 0:
@@ -79,65 +46,123 @@ static uint32_t ram_size_from_code(uint8_t code) {
     }
 }
 
-static std::string to_string(CartridgeType t) {
-    using enum CartridgeType;
-    switch (t) {
-        case ROM_ONLY:
-            return "ROM_ONLY";
-        case ROM_MBC1:
-            return "ROM_MBC1";
-        case ROM_MBC1_RAM:
-            return "ROM_MBC1_RAM";
-        case ROM_MBC1_RAM_BATT:
-            return "ROM_MBC1_RAM_BATT";
-        case ROM_MBC2:
-            return "ROM_MBC2";
-        case ROM_MBC2_BATT:
-            return "ROM_MBC2_BATT";
-        case ROM_RAM:
-            return "ROM_RAM";
-        case ROM_RAM_BATT:
-            return "ROM_RAM_BATT";
-        case ROM_MMM01:
-            return "ROM_MMM01";
-        case ROM_MMM01_SRAM:
-            return "ROM_MMM01_SRAM";
-        case ROM_MMM01_SRAM_BATT:
-            return "ROM_MMM01_SRAM_BATT";
-        case ROM_MBC3_TIMER_BATT:
-            return "ROM_MBC3_TIMER_BATT";
-        case ROM_MBC3_TIMER_RAM_BATT:
-            return "ROM_MBC3_TIMER_RAM_BATT";
-        case ROM_MBC3:
-            return "ROM_MBC3";
-        case ROM_MBC3_RAM_:
-            return "ROM_MBC3_RAM_";
-        case ROM_MBC3_RAM_BATT:
-            return "ROM_MBC3_RAM_BATT";
-        case ROM_MBC5:
-            return "ROM_MBC5";
-        case ROM_MBC5_RAM_:
-            return "ROM_MBC5_RAM_";
-        case ROM_MBC5_RAM_BATT:
-            return "ROM_MBC5_RAM_BATT";
-        case ROM_MBC5_RUMBLE:
-            return "ROM_MBC5_RUMBLE";
-        case ROM_MBC5_RUMBLE_RAM:
-            return "ROM_MBC5_RUMBLE_RAM";
-        case ROM_MBC5_RUMBLE_RAM_BATT:
-            return "ROM_MBC5_RUMBLE_RAM_BATT";
-        case POCKET_CAMERA:
-            return "POCKET_CAMERA";
-        case BANDAI_TAMA5:
-            return "BANDAI_TAMA5";
-        case HUDSON_HUC3:
-            return "HUDSON_HUC3";
-        case HUDSON_HUC1:
-            return "HUDSON_HUC1";
-        default:
-            return "INVALID";
-    }
+static int compute_n_ram_banks(size_t ram_size) {
+    return (ram_size + 8 * 1024 - 1) / (8 * 1024);
 }
+
+static int compute_n_rom_banks(size_t rom_size) {
+    return rom_size / (16 * 1024);
+}
+
+class Mbc {
+public:
+    virtual ~Mbc()                                      = default;
+    virtual void write_mbc(uint16_t addr, uint8_t data) = 0;
+    virtual uint8_t read_rom(uint16_t addr) const       = 0;
+    virtual uint8_t read_ram(uint16_t addr) const       = 0;
+    virtual void write_ram(uint16_t addr, uint8_t data) = 0;
+};
+
+class NullMbc : public Mbc {
+public:
+    NullMbc(const std::vector<uint8_t> &rom) : rom(rom) {
+    }
+
+    void write_mbc(uint16_t addr, uint8_t data) override {
+        // throw std::runtime_error(fmt::format("Invalid write to MBC of ${:02X} at ${:04X} for cartridge type ${:02X} ({})", data, addr, this->type, to_string(this->type)));
+        logging::warning(fmt::format("Invalid write to NullMc of ${:02X} at ${:04X}", data, addr));
+    }
+
+    uint8_t read_rom(uint16_t addr) const override {
+        if (addr < 0x8000) {
+            return this->rom[addr];
+        } else {
+            throw std::runtime_error(fmt::format("Invalid address passed to NullMbc::read_rom: ${:04X}", addr));
+        }
+    }
+
+    uint8_t read_ram(uint16_t addr) const override {
+        return 0xff;
+    }
+
+    void write_ram(uint16_t addr, uint8_t data) override {
+    }
+
+private:
+    const std::vector<uint8_t> &rom;
+};
+
+class Mbc1 : public Mbc {
+    enum class BankMode { LARGE_ROM_BANKING = 0, RAM_BANKING = 1 };
+
+public:
+    Mbc1(const std::vector<uint8_t> &rom, std::vector<uint8_t> &ram) : rom(rom), ram(ram) {
+    }
+
+    void write_mbc(uint16_t addr, uint8_t data) override {
+        if (addr < 0x2000) {
+            const bool has_ram = this->ram.size() > 0;
+            this->ram_enabled  = has_ram && (data & 0x0f) == 0x0a;
+        } else if (addr < 0x4000) {
+            const uint8_t val       = data & 0x1f;
+            const uint8_t bank_5lsb = (val == 0) ? 1 : val;
+            this->rom_bank          = ((this->rom_bank & (~0x1f)) | bank_5lsb) % compute_n_rom_banks(this->rom.size());
+        } else if (addr < 0x6000) {
+            if (this->bank_mode == BankMode::RAM_BANKING) {
+                this->ram_bank = 0x3 & data;
+            } else {
+                this->rom_bank =
+                    (((0x3 & data) << 5) | (this->rom_bank & 0x1f)) % compute_n_rom_banks(this->rom.size());
+            }
+        } else if (addr < 0x8000) {
+            this->bank_mode = static_cast<BankMode>(0x01 & data);
+        }
+    }
+
+    uint8_t read_rom(uint16_t addr) const override {
+        if (addr < 0x4000) {
+            return this->rom[addr];
+        } else if (addr < 0x8000) {
+            const uint32_t actual_address = addr + uint32_t(0x4000) * (this->rom_bank - 1);
+            return this->rom[actual_address];
+        } else {
+            throw std::runtime_error(fmt::format("Invalid address passed to Cartridge::read_rom: ${:04X}", addr));
+        }
+    }
+
+    uint8_t read_ram(uint16_t addr) const override {
+        if (!this->ram_enabled) {
+            return 0xff;
+        }
+
+        if (this->bank_mode == BankMode::RAM_BANKING) {
+            return this->ram[(this->ram_bank << 13) | addr];
+        } else {
+            return this->ram[addr]; // TODO: or does this still work as above??
+        }
+    }
+
+    void write_ram(uint16_t addr, uint8_t data) override {
+        if (this->ram_enabled) {
+            if (this->bank_mode == BankMode::RAM_BANKING) {
+                this->ram[(this->ram_bank << 13) | addr] = data;
+            } else {
+                // TODO: or does this still work as above??
+                this->ram[addr] = data;
+            }
+        }
+    }
+
+private:
+    const std::vector<uint8_t> &rom;
+    std::vector<uint8_t> &ram;
+
+    bool ram_enabled{false};
+    BankMode bank_mode{BankMode::LARGE_ROM_BANKING};
+    int rom_bank{1};
+    int ram_bank{0};
+};
+
 
 Cartridge::Cartridge(const std::vector<uint8_t> &rom_bytes)
     : rom(rom_bytes),
@@ -194,7 +219,12 @@ Cartridge::Cartridge(const std::vector<uint8_t> &rom_bytes)
     // initialize mbc
     switch (this->type) {
         case CartridgeType::ROM_ONLY:
-            this->mbc = std::make_unique<NullMbc>();
+            this->mbc = std::make_unique<NullMbc>(this->rom);
+            break;
+        case CartridgeType::ROM_MBC1:
+        case CartridgeType::ROM_MBC1_RAM:
+        case CartridgeType::ROM_MBC1_RAM_BATT:
+            this->mbc = std::make_unique<Mbc1>(this->rom, this->ram);
             break;
         default:
             throw std::runtime_error(
@@ -233,11 +263,11 @@ int Cartridge::get_rom_size() const {
 }
 
 int Cartridge::get_ram_banks() const {
-    return (this->ram.size() + 8 * 1024 - 1) / (8 * 1024);
+    return compute_n_ram_banks(this->ram.size());
 }
 
 int Cartridge::get_rom_banks() const {
-    return this->rom.size() / (16 * 1024);
+    return compute_n_rom_banks(this->rom.size());
 }
 
 std::string Cartridge::get_type_str() const {
@@ -281,15 +311,15 @@ void Cartridge::write_mbc(uint16_t addr, uint8_t data) {
 }
 
 uint8_t Cartridge::read_rom(uint16_t addr) const {
-    return this->rom[this->mbc->translate_rom_address(addr)];
+    return this->mbc->read_rom(addr);
 }
 
 uint8_t Cartridge::read_ram(uint16_t addr) const {
-    throw std::runtime_error(fmt::format("read_ram not implemented (input: ${:04X})", addr));
+    return this->mbc->read_ram(addr);
 }
 
 void Cartridge::write_ram(uint16_t addr, uint8_t data) {
-    throw std::runtime_error(fmt::format("write_ram not implemented (input: ${:04X}, ${:02X})", addr, data));
+    this->mbc->write_ram(addr, data);
 }
 
 void Cartridge::dump_ram(std::ostream &os) {
@@ -300,5 +330,65 @@ void Cartridge::dump_ram(std::ostream &os) {
         }
 
         os << fmt::format(" {:02X}", this->ram[i]);
+    }
+}
+
+std::string to_string(CartridgeType t) {
+    using enum CartridgeType;
+    switch (t) {
+        case ROM_ONLY:
+            return "ROM_ONLY";
+        case ROM_MBC1:
+            return "ROM_MBC1";
+        case ROM_MBC1_RAM:
+            return "ROM_MBC1_RAM";
+        case ROM_MBC1_RAM_BATT:
+            return "ROM_MBC1_RAM_BATT";
+        case ROM_MBC2:
+            return "ROM_MBC2";
+        case ROM_MBC2_BATT:
+            return "ROM_MBC2_BATT";
+        case ROM_RAM:
+            return "ROM_RAM";
+        case ROM_RAM_BATT:
+            return "ROM_RAM_BATT";
+        case ROM_MMM01:
+            return "ROM_MMM01";
+        case ROM_MMM01_SRAM:
+            return "ROM_MMM01_SRAM";
+        case ROM_MMM01_SRAM_BATT:
+            return "ROM_MMM01_SRAM_BATT";
+        case ROM_MBC3_TIMER_BATT:
+            return "ROM_MBC3_TIMER_BATT";
+        case ROM_MBC3_TIMER_RAM_BATT:
+            return "ROM_MBC3_TIMER_RAM_BATT";
+        case ROM_MBC3:
+            return "ROM_MBC3";
+        case ROM_MBC3_RAM_:
+            return "ROM_MBC3_RAM_";
+        case ROM_MBC3_RAM_BATT:
+            return "ROM_MBC3_RAM_BATT";
+        case ROM_MBC5:
+            return "ROM_MBC5";
+        case ROM_MBC5_RAM_:
+            return "ROM_MBC5_RAM_";
+        case ROM_MBC5_RAM_BATT:
+            return "ROM_MBC5_RAM_BATT";
+        case ROM_MBC5_RUMBLE:
+            return "ROM_MBC5_RUMBLE";
+        case ROM_MBC5_RUMBLE_RAM:
+            return "ROM_MBC5_RUMBLE_RAM";
+        case ROM_MBC5_RUMBLE_RAM_BATT:
+            return "ROM_MBC5_RUMBLE_RAM_BATT";
+        case POCKET_CAMERA:
+            return "POCKET_CAMERA";
+        case BANDAI_TAMA5:
+            return "BANDAI_TAMA5";
+        case HUDSON_HUC3:
+            return "HUDSON_HUC3";
+        case HUDSON_HUC1:
+            return "HUDSON_HUC1";
+        default:
+            return "INVALID";
     }
 }
