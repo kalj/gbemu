@@ -216,12 +216,13 @@ void Ppu::do_tick(std::vector<uint32_t> &buf, const IBus &bus, InterruptState &i
     } else if(this->mode == 3) {
 
         if(this->lx == 90) {
-            int8_t object_indices[10];
-            int8_t object_row[10];
+            const int n_objects_max = 10;
+            int8_t object_indices[n_objects_max];
+            int8_t object_row[n_objects_max];
             int n_object_indices=0;
             // foreach object in oam, gather (up to) 10 relevant ones
             const auto tile_height = this->lcdc&LCDC_OBJ_SIZE ? 16 : 8;
-            for(int i=0; i<40; i++) {
+            for(int i=0; i<40 && n_object_indices<n_objects_max; i++) {
                 const auto ypos = this->oam[4*i];
 
                 if(this->ly+16 >= ypos && this->ly+16 < ypos+tile_height) {
