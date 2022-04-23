@@ -8,7 +8,9 @@
 #include <vector>
 
 class InterruptState;
-class Controller;
+namespace gb_controller {
+    class Controller;
+}
 class Ppu;
 class DivTimer;
 class Sound;
@@ -17,7 +19,13 @@ class Cartridge;
 
 class Bus : public IBus {
 public:
-    Bus(Cartridge &cart, Controller &cntl, Communication &comm, DivTimer &dt, Sound &snd, Ppu &ppu, InterruptState &is);
+    Bus(Cartridge &cart,
+        gb_controller::Controller &cntl,
+        Communication &comm,
+        DivTimer &dt,
+        Sound &snd,
+        Ppu &ppu,
+        InterruptState &is);
 
     uint8_t read(uint16_t addr) const override;
     void write(uint16_t addr, uint8_t data) override;
@@ -29,7 +37,7 @@ private:
     std::vector<uint8_t> hram;
 
     Cartridge &cartridge;
-    Controller &controller;
+    gb_controller::Controller &controller;
     Communication &communication;
     DivTimer &div_timer;
     Sound &sound;

@@ -83,10 +83,31 @@ int main(int argc, char **argv) {
             if (!nowin) {
                 SDL_Event event;
                 while (SDL_PollEvent(&event)) {
-                    if (event.type == SDL_QUIT ||
-                        (event.type == SDL_KEYDOWN &&
-                         (event.key.keysym.sym == SDLK_q || event.key.keysym.sym == SDLK_ESCAPE))) {
+                    if (event.type == SDL_QUIT) {
                         running = false;
+                    } else if(event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE) {
+                            running = false;
+                    } else if(event.type == SDL_KEYDOWN || event.type == SDL_KEYUP) {
+                        const gb_controller::State new_state =
+                            event.type == SDL_KEYDOWN ? gb_controller::State::DOWN : gb_controller::State::UP;
+
+                        if (event.key.keysym.sym == SDLK_UP) {
+                            gb.set_button_state(gb_controller::Button::UP, new_state);
+                        } else if (event.key.keysym.sym == SDLK_DOWN) {
+                            gb.set_button_state(gb_controller::Button::DOWN, new_state);
+                        } else if (event.key.keysym.sym == SDLK_LEFT) {
+                            gb.set_button_state(gb_controller::Button::LEFT, new_state);
+                        } else if (event.key.keysym.sym == SDLK_RIGHT) {
+                            gb.set_button_state(gb_controller::Button::RIGHT, new_state);
+                        } else if (event.key.keysym.sym == SDLK_x) {
+                            gb.set_button_state(gb_controller::Button::A, new_state);
+                        } else if (event.key.keysym.sym == SDLK_z) {
+                            gb.set_button_state(gb_controller::Button::B, new_state);
+                        } else if (event.key.keysym.sym == SDLK_RETURN) {
+                            gb.set_button_state(gb_controller::Button::START, new_state);
+                        } else if (event.key.keysym.sym == SDLK_BACKSPACE) {
+                            gb.set_button_state(gb_controller::Button::SELECT, new_state);
+                        }
                     }
                 }
             }

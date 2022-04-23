@@ -1,15 +1,15 @@
 #ifndef GAMEBOY_H
 #define GAMEBOY_H
 
-#include "cpu.h"
-#include "ppu.h"
-#include "controller.h"
+#include "bus.h"
+#include "cartridge.h"
 #include "communication.h"
-#include "sound.h"
+#include "controller.h"
+#include "cpu.h"
 #include "div_timer.h"
 #include "interrupt_state.h"
-#include "cartridge.h"
-#include "bus.h"
+#include "ppu.h"
+#include "sound.h"
 
 #include <cstdint>
 
@@ -26,13 +26,19 @@ public:
     }
 
     void do_tick();
+
+    void set_button_state(gb_controller::Button button, gb_controller::State state) {
+        this->controller.set_button_state(button, state);
+    }
+
     void dump(std::ostream &os) const;
+
 private:
     uint64_t clock{0};
     Cartridge cartridge;
     Cpu cpu;
     Sound sound;
-    Controller controller;
+    gb_controller::Controller controller;
     Communication communication;
     DivTimer div_timer;
     InterruptState interrupt_state;
