@@ -5,6 +5,13 @@
 // TODO: set interrupt (bit 4 in IF) at high-to-low transitions (of stuff that is active!)
 
 namespace gb_controller {
+    void Controller::reset() {
+        this->directions_selected     = false;
+        this->actions_selected        = false;
+        this->direction_buttons_state = 0xff;
+        this->action_buttons_state    = 0xff;
+    }
+
     void Controller::set_button_state(Button button, State state) {
         switch (button) {
             case Button::RIGHT:

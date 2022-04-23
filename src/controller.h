@@ -23,7 +23,7 @@ namespace gb_controller {
 
     class Controller {
     public:
-        // void set_states(uint8_t d_u_l_r_st_sel_b_a);
+        void reset();
         uint8_t read_reg() const;
         void write_reg(uint8_t data);
         void dump(std::ostream &os) const;

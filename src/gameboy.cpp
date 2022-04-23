@@ -42,6 +42,7 @@ void Gameboy::reset() {
     this->sound.reset();
     this->ppu.reset();
     this->interrupt_state.reset();
+    this->controller.reset();
 }
 
 void Gameboy::do_tick() {
