@@ -69,8 +69,13 @@ private:
 
     uint8_t rlc(uint8_t oldval, bool with_z_flag);
     uint8_t rrc(uint8_t oldval, bool with_z_flag);
-    void rl(uint8_t &reg, bool with_z_flag);
-    void rr(uint8_t &reg, bool with_z_flag);
+    uint8_t rl(uint8_t oldval, bool with_z_flag);
+    uint8_t rr(uint8_t oldval, bool with_z_flag);
+
+    uint8_t sla(uint8_t oldval);
+    uint8_t sra(uint8_t oldval);
+    uint8_t swap(uint8_t oldval);
+    uint8_t srl(uint8_t oldval);
 
     // registers
     uint8_t a{0};

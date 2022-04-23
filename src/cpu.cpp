@@ -5,6 +5,10 @@
 
 #include <fmt/core.h>
 
+#include <functional>
+#include <tuple>
+#include <vector>
+
 void Cpu::reset() {
     this->a = 0x01;        // on GB/SGB. 0xff on GBP, 0x11 on GBC
     this->set_f(0xb0);     // 0xb0;
@@ -15,8 +19,8 @@ void Cpu::reset() {
     this->pc     = 0x0100;
 
     this->halted = false;
-    this->cycle = 0;
-    this->ime   = false;
+    this->cycle  = 0;
+    this->ime    = false;
 }
 
 uint8_t &Cpu::decode_reg8(uint8_t bits) {
@@ -196,26 +200,62 @@ uint8_t Cpu::rrc(uint8_t oldval, bool with_z_flag) {
     return res;
 }
 
-void Cpu::rl(uint8_t &reg, bool with_z_flag) {
-    const uint8_t res = (reg << 1) | (this->flag_c ? 0x01 : 0x00); // rotate left with carry.
-    this->flag_c      = reg & 0x80;                                // bit 7 goes into carry
-    reg               = res;
-    this->flag_z      = with_z_flag && reg == 0;
+uint8_t Cpu::rl(uint8_t oldval, bool with_z_flag) {
+    const uint8_t res = (oldval << 1) | (this->flag_c ? 0x01 : 0x00); // rotate left with carry.
+    this->flag_c      = oldval & 0x80;                                // bit 7 goes into carry
+    this->flag_z      = with_z_flag && res == 0;
     this->flag_h      = false;
     this->flag_n      = false;
+    return res;
 }
 
-void Cpu::rr(uint8_t &reg, bool with_z_flag) {
-    const uint8_t res = (this->flag_c ? 0x80 : 0x00) | (reg >> 1); // rotate right with carry;
-    this->flag_c      = reg & 0x01;                                // bit 0 goes into carry
-    reg               = res;
-    this->flag_z      = with_z_flag && reg == 0;
+uint8_t Cpu::rr(uint8_t oldval, bool with_z_flag) {
+    const uint8_t res = (this->flag_c ? 0x80 : 0x00) | (oldval >> 1); // rotate right with carry;
+    this->flag_c      = oldval & 0x01;                                // bit 0 goes into carry
+    this->flag_z      = with_z_flag && res == 0;
     this->flag_h      = false;
     this->flag_n      = false;
+    return res;
+}
+
+uint8_t Cpu::sla(uint8_t oldval) {
+    this->flag_c      = oldval & 0x80;
+    const uint8_t res = oldval << 1;
+    this->flag_z      = res == 0;
+    this->flag_h      = false;
+    this->flag_n      = false;
+    return res;
+}
+
+uint8_t Cpu::sra(uint8_t oldval) {
+    this->flag_c      = oldval & 0x01;
+    const uint8_t res = (oldval & 0x80) | (oldval >> 1); // keep msb
+    this->flag_z      = res == 0;
+    this->flag_h      = false;
+    this->flag_n      = false;
+    return res;
+}
+
+uint8_t Cpu::swap(uint8_t oldval) {
+    const uint8_t res = ((oldval & 0xf) << 4) | ((oldval >> 4) & 0xf);
+    this->flag_z      = res == 0;
+    this->flag_c      = false;
+    this->flag_h      = false;
+    this->flag_n      = false;
+    return res;
+}
+
+uint8_t Cpu::srl(uint8_t oldval) {
+    this->flag_c      = oldval & 0x01;
+    const uint8_t res = (oldval >> 1); // unsigned shift drops msb correctly
+    this->flag_z      = res == 0;
+    this->flag_h      = false;
+    this->flag_n      = false;
+    return res;
 }
 
 void Cpu::do_tick(uint64_t clock, IBus &bus, InterruptState &int_state) {
-    if(clock%4 != 0) {
+    if (clock % 4 != 0) {
         // divide the clock by 4 to get 1MiHz (2^20 Hz)
         return;
     }
@@ -232,7 +272,7 @@ void Cpu::do_tick(uint64_t clock, IBus &bus, InterruptState &int_state) {
 
             this->cycle++;
             logging::debug(fmt::format("\t\t\t\t\t\t\t\t Interrupt detected: {}\n",
-                            interrupt_cause_to_string(this->isr_active.value())));
+                                       interrupt_cause_to_string(this->isr_active.value())));
         } else {
             this->opcode = bus.read(this->pc);
             logging::debug(fmt::format("\t\t\t\t\t\t\t\t read opcode: ${:02X} -> ", this->opcode));
@@ -435,9 +475,9 @@ void Cpu::do_tick(uint64_t clock, IBus &bus, InterruptState &int_state) {
 
                 reg = bus.read(this->hl.r16);
                 logging::debug(fmt::format("\t\t\t\t\t\t\t\t\t {} loaded from (HL) (${:04X}) = ${:02X}\n",
-                                reg_name,
-                                this->hl.r16,
-                                reg));
+                                           reg_name,
+                                           this->hl.r16,
+                                           reg));
                 this->pc += 1;
                 this->cycle = 0;
             }
@@ -460,9 +500,9 @@ void Cpu::do_tick(uint64_t clock, IBus &bus, InterruptState &int_state) {
 
                 bus.write(this->hl.r16, reg);
                 logging::debug(fmt::format("\t\t\t\t\t\t\t\t\t {} written to (HL) (${:04X}) = ${:02X}\n",
-                                reg_name,
-                                this->hl.r16,
-                                reg));
+                                           reg_name,
+                                           this->hl.r16,
+                                           reg));
                 this->pc += 1;
                 this->cycle = 0;
             }
@@ -499,7 +539,8 @@ void Cpu::do_tick(uint64_t clock, IBus &bus, InterruptState &int_state) {
                 this->cycle++;
             } else {
                 bus.write(this->hl.r16, this->tmp1);
-                logging::debug(fmt::format("\t\t\t\t\t\t\t\t\t ${:02X} stored to (hl) (${:04X})\n", this->tmp1, this->hl.r16));
+                logging::debug(
+                    fmt::format("\t\t\t\t\t\t\t\t\t ${:02X} stored to (hl) (${:04X})\n", this->tmp1, this->hl.r16));
 
                 this->pc += 2;
                 this->cycle = 0;
@@ -517,7 +558,8 @@ void Cpu::do_tick(uint64_t clock, IBus &bus, InterruptState &int_state) {
                 const auto reg_name = this->opcode & 0x10 ? "DE" : "BC";
                 const auto reg      = this->opcode & 0x10 ? this->de.r16 : this->bc.r16;
                 this->a             = bus.read(reg);
-                logging::debug(fmt::format("\t\t\t\t\t\t\t\t\t a (${:02X}) read from ({}) (${:04X})\n", this->a, reg_name, reg));
+                logging::debug(
+                    fmt::format("\t\t\t\t\t\t\t\t\t a (${:02X}) read from ({}) (${:04X})\n", this->a, reg_name, reg));
                 this->pc += 1;
                 this->cycle = 0;
             }
@@ -528,7 +570,8 @@ void Cpu::do_tick(uint64_t clock, IBus &bus, InterruptState &int_state) {
                 this->cycle++;
             } else if (this->cycle == 1) {
                 this->a = bus.read(this->hl.r16);
-                logging::debug(fmt::format("\t\t\t\t\t\t\t\t\t a (${:02X}) read from (hl) (${:04X}), and hl incremented\n",
+                logging::debug(
+                    fmt::format("\t\t\t\t\t\t\t\t\t a (${:02X}) read from (hl) (${:04X}), and hl incremented\n",
                                 this->a,
                                 this->hl.r16));
                 this->hl.r16++;
@@ -542,7 +585,8 @@ void Cpu::do_tick(uint64_t clock, IBus &bus, InterruptState &int_state) {
                 this->cycle++;
             } else if (this->cycle == 1) {
                 this->a = bus.read(this->hl.r16);
-                logging::debug(fmt::format("\t\t\t\t\t\t\t\t\t a (${:02X}) read from (hl) (${:04X}), and hl decremented\n",
+                logging::debug(
+                    fmt::format("\t\t\t\t\t\t\t\t\t a (${:02X}) read from (hl) (${:04X}), and hl decremented\n",
                                 this->a,
                                 this->hl.r16));
                 this->hl.r16--;
@@ -562,7 +606,8 @@ void Cpu::do_tick(uint64_t clock, IBus &bus, InterruptState &int_state) {
                 const auto reg      = this->opcode & 0x10 ? this->de.r16 : this->bc.r16;
 
                 bus.write(reg, this->a);
-                logging::debug(fmt::format("\t\t\t\t\t\t\t\t\t a (${:02X}) stored to ({}) (${:04X})\n", this->a, reg_name, reg));
+                logging::debug(
+                    fmt::format("\t\t\t\t\t\t\t\t\t a (${:02X}) stored to ({}) (${:04X})\n", this->a, reg_name, reg));
                 this->pc += 1;
                 this->cycle = 0;
             }
@@ -573,7 +618,8 @@ void Cpu::do_tick(uint64_t clock, IBus &bus, InterruptState &int_state) {
                 this->cycle++;
             } else if (this->cycle == 1) {
                 bus.write(this->hl.r16, this->a);
-                logging::debug(fmt::format("\t\t\t\t\t\t\t\t\t a (${:02X}) stored to (hl) (${:04X}), and hl incremented\n",
+                logging::debug(
+                    fmt::format("\t\t\t\t\t\t\t\t\t a (${:02X}) stored to (hl) (${:04X}), and hl incremented\n",
                                 this->a,
                                 this->hl.r16));
                 this->hl.r16++;
@@ -587,7 +633,8 @@ void Cpu::do_tick(uint64_t clock, IBus &bus, InterruptState &int_state) {
                 this->cycle++;
             } else if (this->cycle == 1) {
                 bus.write(this->hl.r16, this->a);
-                logging::debug(fmt::format("\t\t\t\t\t\t\t\t\t a (${:02X}) stored to (hl) (${:04X}), and hl decremented\n",
+                logging::debug(
+                    fmt::format("\t\t\t\t\t\t\t\t\t a (${:02X}) stored to (hl) (${:04X}), and hl decremented\n",
                                 this->a,
                                 this->hl.r16));
                 this->hl.r16--;
@@ -737,9 +784,9 @@ void Cpu::do_tick(uint64_t clock, IBus &bus, InterruptState &int_state) {
                 const auto op_i8 = static_cast<int8_t>(this->tmp1);
                 this->hl.r16     = this->get_add_sp(op_i8);
                 logging::debug(fmt::format("\t\t\t\t\t\t\t\t\t HL = SP+s8 = ${:04X} {:+d} = ${:04X}\n",
-                                this->sp,
-                                op_i8,
-                                this->hl.r16));
+                                           this->sp,
+                                           op_i8,
+                                           this->hl.r16));
                 this->pc += 2;
                 this->cycle = 0;
             }
@@ -855,7 +902,7 @@ void Cpu::do_tick(uint64_t clock, IBus &bus, InterruptState &int_state) {
         case 0x17: // RLA
         {
             logging::debug(fmt::format("RLA\n"));
-            this->rl(this->a, false);
+            this->a = this->rl(this->a, false);
 
             logging::debug(fmt::format("\t\t\t\t\t\t\t\t\t 9-bit rotate left of A = ${:02X}\n", this->a));
             this->pc += 1;
@@ -863,7 +910,7 @@ void Cpu::do_tick(uint64_t clock, IBus &bus, InterruptState &int_state) {
         case 0x1F: // RRA
         {
             logging::debug(fmt::format("RRA\n"));
-            this->rr(this->a, false);
+            this->a = this->rr(this->a, false);
 
             logging::debug(fmt::format("\t\t\t\t\t\t\t\t\t 9-bit rotate right of A = ${:02X}\n", this->a));
             this->pc += 1;
@@ -919,7 +966,8 @@ void Cpu::do_tick(uint64_t clock, IBus &bus, InterruptState &int_state) {
                 const auto operand_str = this->opcode & 0x40
                                              ? fmt::format("${:02X}", operand)
                                              : fmt::format("${:02X} (@ ${:04X})", operand, operand_address);
-                logging::debug(fmt::format("\t\t\t\t\t\t\t\t\t A = A {} {} = ${:02X}\n", instr_name, operand_str, this->a));
+                logging::debug(
+                    fmt::format("\t\t\t\t\t\t\t\t\t A = A {} {} = ${:02X}\n", instr_name, operand_str, this->a));
                 this->cycle = 0;
             }
             break;
@@ -946,7 +994,8 @@ void Cpu::do_tick(uint64_t clock, IBus &bus, InterruptState &int_state) {
                 const auto operand_str = this->opcode & 0x40
                                              ? fmt::format("${:02X}", operand)
                                              : fmt::format("${:02X} (@ ${:04X})", operand, operand_address);
-                logging::debug(fmt::format("\t\t\t\t\t\t\t\t\t A = A {} {} = ${:02X}\n", instr_name, operand_str, this->a));
+                logging::debug(
+                    fmt::format("\t\t\t\t\t\t\t\t\t A = A {} {} = ${:02X}\n", instr_name, operand_str, this->a));
                 this->cycle = 0;
             }
             break;
@@ -1015,9 +1064,9 @@ void Cpu::do_tick(uint64_t clock, IBus &bus, InterruptState &int_state) {
                 this->sp               = this->get_add_sp(op_i8);
 
                 logging::debug(fmt::format("\t\t\t\t\t\t\t\t\t SP = SP+s8 = ${:04X}{:+d} = ${:04X}\n",
-                                original_sp,
-                                op_i8,
-                                this->sp));
+                                           original_sp,
+                                           op_i8,
+                                           this->sp));
                 this->pc += 2;
                 this->cycle = 0;
             }
@@ -1114,7 +1163,8 @@ void Cpu::do_tick(uint64_t clock, IBus &bus, InterruptState &int_state) {
                 const auto operand_str = this->opcode & 0x40
                                              ? fmt::format("${:02X}", operand)
                                              : fmt::format("${:02X} (@ ${:04X})", operand, operand_address);
-                logging::debug(fmt::format("\t\t\t\t\t\t\t\t\t A = A {} {} = ${:02X}\n", instr_name, operand_str, this->a));
+                logging::debug(
+                    fmt::format("\t\t\t\t\t\t\t\t\t A = A {} {} = ${:02X}\n", instr_name, operand_str, this->a));
                 this->cycle = 0;
             }
             break;
@@ -1172,7 +1222,8 @@ void Cpu::do_tick(uint64_t clock, IBus &bus, InterruptState &int_state) {
             } else if (this->cycle == 2) {
                 const auto newval = this->get_dec(this->tmp1);
                 bus.write(this->hl.r16, newval);
-                logging::debug(fmt::format("\t\t\t\t\t\t\t\t\t (HL) (${:04X}) decremented to ${:02X}\n", this->hl.r16, newval));
+                logging::debug(
+                    fmt::format("\t\t\t\t\t\t\t\t\t (HL) (${:04X}) decremented to ${:02X}\n", this->hl.r16, newval));
                 this->pc += 1;
                 this->cycle = 0;
             }
@@ -1189,7 +1240,8 @@ void Cpu::do_tick(uint64_t clock, IBus &bus, InterruptState &int_state) {
             } else if (this->cycle == 2) {
                 const auto newval = this->get_inc(this->tmp1);
                 bus.write(this->hl.r16, newval);
-                logging::debug(fmt::format("\t\t\t\t\t\t\t\t\t (HL) (${:04X}) incremented to ${:02X}\n", this->hl.r16, newval));
+                logging::debug(
+                    fmt::format("\t\t\t\t\t\t\t\t\t (HL) (${:04X}) incremented to ${:02X}\n", this->hl.r16, newval));
                 this->pc += 1;
                 this->cycle = 0;
             }
@@ -1246,7 +1298,8 @@ void Cpu::do_tick(uint64_t clock, IBus &bus, InterruptState &int_state) {
             logging::debug(fmt::format("CP {}\n", reg_name));
             this->get_sub(reg, false);
 
-            logging::debug(fmt::format("\t\t\t\t\t\t\t\t\t A (${:02X}) compared to {} (${:02X})\n", this->a, reg_name, reg));
+            logging::debug(
+                fmt::format("\t\t\t\t\t\t\t\t\t A (${:02X}) compared to {} (${:02X})\n", this->a, reg_name, reg));
             this->pc++;
         } break;
 
@@ -1269,9 +1322,9 @@ void Cpu::do_tick(uint64_t clock, IBus &bus, InterruptState &int_state) {
                                              : fmt::format("${:02X} (@ ${:04X})", operand, operand_address);
 
                 logging::debug(fmt::format("\t\t\t\t\t\t\t\t\t A (${:02X}) compared to {} (${:02X})\n",
-                                this->a,
-                                operand_str,
-                                operand));
+                                           this->a,
+                                           operand_str,
+                                           operand));
                 this->cycle = 0;
             }
             break;
@@ -1292,8 +1345,8 @@ void Cpu::do_tick(uint64_t clock, IBus &bus, InterruptState &int_state) {
                 const int16_t offset = static_cast<int8_t>(this->tmp1);
                 this->pc += offset + 2;
                 logging::debug(fmt::format("\t\t\t\t\t\t\t\t\t doing relative jump with offset {} to ${:04X}\n",
-                                offset,
-                                this->pc));
+                                           offset,
+                                           this->pc));
                 this->cycle = 0;
             }
             break;
@@ -1326,8 +1379,8 @@ void Cpu::do_tick(uint64_t clock, IBus &bus, InterruptState &int_state) {
                 const int16_t offset = static_cast<int8_t>(this->tmp1);
                 this->pc += offset + 2; // extra 2 ?
                 logging::debug(fmt::format("\t\t\t\t\t\t\t\t\t relative jump taken with offset {} to ${:04X}\n",
-                                offset,
-                                this->pc));
+                                           offset,
+                                           this->pc));
                 this->cycle = 0;
             }
             break;
@@ -1455,7 +1508,8 @@ void Cpu::do_tick(uint64_t clock, IBus &bus, InterruptState &int_state) {
                 this->cycle++;
             } else if (this->cycle == 5) {
                 this->pc = (static_cast<uint16_t>(this->tmp2) << 8) | static_cast<uint16_t>(this->tmp1);
-                logging::debug(fmt::format("\t\t\t\t\t\t\t\t\t Conditional calling to subroutine at: ${:04X}\n", this->pc));
+                logging::debug(
+                    fmt::format("\t\t\t\t\t\t\t\t\t Conditional calling to subroutine at: ${:04X}\n", this->pc));
                 this->cycle = 0;
             }
             break;
@@ -1561,7 +1615,8 @@ void Cpu::do_tick(uint64_t clock, IBus &bus, InterruptState &int_state) {
             } else if (this->cycle == 3) {
                 this->ime = true;
                 this->pc  = (static_cast<uint16_t>(this->tmp2) << 8) | static_cast<uint16_t>(this->tmp1);
-                logging::debug(fmt::format("\t\t\t\t\t\t\t\t\t Returning from interrupt handler (interrupts reenabled)\n"));
+                logging::debug(
+                    fmt::format("\t\t\t\t\t\t\t\t\t Returning from interrupt handler (interrupts reenabled)\n"));
                 this->cycle = 0;
             }
             break;
@@ -1602,220 +1657,51 @@ void Cpu::do_tick(uint64_t clock, IBus &bus, InterruptState &int_state) {
                 logging::debug(fmt::format("\t\t\t\t\t\t\t\t read extended opcode: ${:02X} -> ", this->tmp1));
             }
 
-            if ((this->tmp1 & 0b11111000) == 0b00000000) { // RLC
-                if ((this->tmp1 & 0x7) == 0x06) {          // RLC (HL)
+            if ((this->tmp1 & 0b11000000) == 0b00000000) {
+
+                const std::vector<std::tuple<std::string, std::string, std::function<uint8_t(uint8_t)>>> shiftop_map = {
+                    {"RLC", "8-bit rotate left", [this](uint8_t a) { return this->rlc(a, true); }},
+                    {"RRC", "8-bit rotate right", [this](uint8_t a) { return this->rrc(a, true); }},
+                    {"RL", "9-bit rotate left", [this](uint8_t a) { return this->rl(a, true); }},
+                    {"RR", "9-bit rotate right", [this](uint8_t a) { return this->rr(a, true); }},
+
+                    {"SLA", "Left shift", [this](uint8_t a) { return this->sla(a); }},
+                    {"SRA", "Arithmetic right shift", [this](uint8_t a) { return this->sra(a); }},
+                    {"SWAP", "Swapping high and low nibbles", [this](uint8_t a) { return this->swap(a); }},
+                    {"SRL", "Logical right shift", [this](uint8_t a) { return this->srl(a); }},
+                };
+
+                const int operation_index = (this->tmp1 & 0b00111000) >> 3;
+                const int argument_index  = this->tmp1 & 0x7;
+
+                const auto &[instr_name, instr_desc, operation] = shiftop_map[operation_index];
+
+                if (argument_index == 0x06) {
                     if (this->cycle == 1) {
-                        logging::debug(fmt::format("RLC (HL)\n"));
+                        logging::debug(fmt::format("{} (HL)\n", instr_name));
                         this->cycle++;
                     } else if (this->cycle == 2) {
                         this->tmp2 = bus.read(this->hl.r16);
                         this->cycle++;
                     } else if (this->cycle == 3) {
-                        const uint8_t newval = this->rlc(this->tmp2, true);
+                        const uint8_t newval = operation(this->tmp2);
                         bus.write(this->hl.r16, newval);
-                        logging::debug(fmt::format("\t\t\t\t\t\t\t\t\t 8-bit rotate left of (HL) (${:04X}) = ${:02X}\n", this->hl.r16, newval));
+                        logging::debug(fmt::format("\t\t\t\t\t\t\t\t\t {} (HL) (${:04X}) = ${:02X}\n",
+                                                   instr_desc,
+                                                   this->hl.r16,
+                                                   newval));
                         this->pc += 2;
                         this->cycle = 0;
                     }
                 } else {
                     if (this->cycle == 1) {
-                        const auto reg_name = decode_reg8_name(this->tmp1 & 0x7);
-                        logging::debug(fmt::format("RLC {}\n", reg_name));
-                        auto &reg = decode_reg8(this->tmp1 & 0x7);
-                        reg = this->rlc(reg, true);
+                        const auto reg_name = decode_reg8_name(argument_index);
+                        logging::debug(fmt::format("{} {}\n", instr_name, reg_name));
+                        auto &reg = decode_reg8(argument_index);
+                        reg       = operation(reg);
 
-                        logging::debug(fmt::format("\t\t\t\t\t\t\t\t\t 8-bit rotate left of {} = ${:02X}\n", reg_name, reg));
-                        this->pc += 2;
-                        this->cycle = 0;
-                    }
-                }
-            } else if ((this->tmp1 & 0b11111000) == 0b00001000) { // RRC
-                if ((this->tmp1 & 0x7) == 0x06) {                 // RRC (HL)
-                    if (this->cycle == 1) {
-                        logging::debug(fmt::format("RRC (HL)\n"));
-                        this->cycle++;
-                    } else if (this->cycle == 2) {
-                        this->tmp2 = bus.read(this->hl.r16);
-                        this->cycle++;
-                    } else if (this->cycle == 3) {
-                        const uint8_t newval = this->rrc(this->tmp2, true);
-                        bus.write(this->hl.r16, newval);
-                        logging::debug(fmt::format("\t\t\t\t\t\t\t\t\t 8-bit rotate right of (HL) (${:04X}) = ${:02X}\n", this->hl.r16, newval));
-                        this->pc += 2;
-                        this->cycle = 0;
-                    }
-                } else {
-                    if (this->cycle == 1) {
-                        const auto reg_name = decode_reg8_name(this->tmp1 & 0x7);
-                        logging::debug(fmt::format("RRC {}\n", reg_name));
-                        auto &reg = decode_reg8(this->tmp1 & 0x7);
-                        reg = this->rrc(reg, true);
-
-                        logging::debug(fmt::format("\t\t\t\t\t\t\t\t\t 8-bit rotate right of {} = ${:02X}\n", reg_name, reg));
-                        this->pc += 2;
-                        this->cycle = 0;
-                    }
-                }
-            } else if ((this->tmp1 & 0b11111000) == 0b00010000) { // RL
-                if ((this->tmp1 & 0x7) == 0x06) {                 // RL (HL)
-                    logging::debug(fmt::format("???\n"));
-                    throw std::runtime_error(
-                        fmt::format("UNKNOWN EXTENDED OPCODE ${:02X} at PC=${:04X}", this->tmp1, this->pc));
-                } else {
-                    if (this->cycle == 1) {
-                        const auto reg_name = decode_reg8_name(this->tmp1 & 0x7);
-                        logging::debug(fmt::format("RL {}\n", reg_name));
-                        auto &reg = decode_reg8(this->tmp1 & 0x7);
-                        this->rl(reg, true);
-
-                        logging::debug(fmt::format("\t\t\t\t\t\t\t\t\t 9-bit rotate left of {} = ${:02X}\n", reg_name, reg));
-                        this->pc += 2;
-                        this->cycle = 0;
-                    }
-                }
-            } else if ((this->tmp1 & 0b11111000) == 0b00011000) { // RR
-                if ((this->tmp1 & 0x7) == 0x06) {                 // RR (HL)
-                    logging::debug(fmt::format("???\n"));
-                    throw std::runtime_error(
-                        fmt::format("UNKNOWN EXTENDED OPCODE ${:02X} at PC=${:04X}", this->tmp1, this->pc));
-                } else {
-                    if (this->cycle == 1) {
-                        const auto reg_name = decode_reg8_name(this->tmp1 & 0x7);
-                        logging::debug(fmt::format("RR {}\n", reg_name));
-                        auto &reg = decode_reg8(this->tmp1 & 0x7);
-                        this->rr(reg, true);
-
-                        logging::debug(fmt::format("\t\t\t\t\t\t\t\t\t 9-bit rotate right of {} = ${:02X}\n", reg_name, reg));
-                        this->pc += 2;
-                        this->cycle = 0;
-                    }
-                }
-            } else if ((this->tmp1 & 0b11111000) == 0b00100000) { // SLA
-                if ((this->tmp1 & 0x7) == 0x06) {                 // SLA (HL)
-                    logging::debug(fmt::format("???\n"));
-                    throw std::runtime_error(
-                        fmt::format("UNKNOWN EXTENDED OPCODE ${:02X} at PC=${:04X}", this->tmp1, this->pc));
-                } else {
-                    if (this->cycle == 1) {
-                        const auto reg_name = decode_reg8_name(this->tmp1 & 0x7);
-                        logging::debug(fmt::format("SLA {}\n", reg_name));
-                        auto &reg    = decode_reg8(this->tmp1 & 0x7);
-                        this->flag_c = reg & 0x80;
-                        reg          = reg << 1;
-                        this->flag_z = reg == 0;
-                        this->flag_h = false;
-                        this->flag_n = false;
-
-                        logging::debug(fmt::format("\t\t\t\t\t\t\t\t\t Left shift of {} = ${:02X}\n", reg_name, reg));
-                        this->pc += 2;
-                        this->cycle = 0;
-                    }
-                }
-            } else if ((this->tmp1 & 0b11111000) == 0b00101000) { // SRA
-                if ((this->tmp1 & 0x7) == 0x06) {                 // SRA (HL)
-                    logging::debug(fmt::format("???\n"));
-                    throw std::runtime_error(
-                        fmt::format("UNKNOWN EXTENDED OPCODE ${:02X} at PC=${:04X}", this->tmp1, this->pc));
-                } else {
-                    if (this->cycle == 1) {
-                        const auto reg_name = decode_reg8_name(this->tmp1 & 0x7);
-                        logging::debug(fmt::format("SRA {}\n", reg_name));
-                        auto &reg    = decode_reg8(this->tmp1 & 0x7);
-                        this->flag_c = reg & 0x01;
-                        reg          = (reg & 0x80) | (reg >> 1); // keep msb
-                        this->flag_z = reg == 0;
-                        this->flag_h = false;
-                        this->flag_n = false;
-
-                        logging::debug(fmt::format("\t\t\t\t\t\t\t\t\t Arithmetic right shift of {} = ${:02X}\n", reg_name, reg));
-                        this->pc += 2;
-                        this->cycle = 0;
-                    }
-                }
-            } else if ((this->tmp1 & 0b11111000) == 0b00110000) { // SWAP
-                if ((this->tmp1 & 0x7) == 0x06) {                 // SWAP (HL)
-                    logging::debug(fmt::format("???\n"));
-                    throw std::runtime_error(
-                        fmt::format("UNKNOWN EXTENDED OPCODE ${:02X} at PC=${:04X}", this->tmp1, this->pc));
-                } else {
-                    if (this->cycle == 1) {
-                        const auto reg_name = decode_reg8_name(this->tmp1 & 0x7);
-                        logging::debug(fmt::format("SWAP {}\n", reg_name));
-                        auto &reg    = decode_reg8(this->tmp1 & 0x7);
-                        reg          = ((reg & 0xf) << 4) | ((reg >> 4) & 0xf);
-                        this->flag_z = reg == 0;
-                        this->flag_h = false;
-                        this->flag_c = false;
-                        this->flag_n = false;
-
-                        logging::debug(fmt::format("\t\t\t\t\t\t\t\t\t Swapping high and low nibbles of {} = ${:02X}\n",
-                                        reg_name,
-                                        reg));
-                        this->pc += 2;
-                        this->cycle = 0;
-                    }
-                }
-            } else if ((this->tmp1 & 0b11111000) == 0b00111000) { // SRL
-                if ((this->tmp1 & 0x7) == 0x06) {                 // SRL (HL)
-                    logging::debug(fmt::format("???\n"));
-                    throw std::runtime_error(
-                        fmt::format("UNKNOWN EXTENDED OPCODE ${:02X} at PC=${:04X}", this->tmp1, this->pc));
-                } else {
-                    if (this->cycle == 1) {
-                        const auto reg_name = decode_reg8_name(this->tmp1 & 0x7);
-                        logging::debug(fmt::format("SRL {}\n", reg_name));
-                        auto &reg    = decode_reg8(this->tmp1 & 0x7);
-                        this->flag_c = reg & 0x01;
-                        reg          = reg >> 1; // unsigned shift drop msb correctly
-                        this->flag_z = reg == 0;
-                        this->flag_h = false;
-                        this->flag_n = false;
-
-                        logging::debug(fmt::format("\t\t\t\t\t\t\t\t\t Logical right shift of {} = ${:02X}\n", reg_name, reg));
-                        this->pc += 2;
-                        this->cycle = 0;
-                    }
-                }
-            } else if ((this->tmp1 & 0b11000000) == 0b10000000) { // RES <bit>, r
-                if ((this->tmp1 & 0x7) == 0x06) {                 // RES <bit>, (HL)
-                    logging::debug(fmt::format("???\n"));
-                    throw std::runtime_error(
-                        fmt::format("UNKNOWN EXTENDED OPCODE ${:02X} at PC=${:04X}", this->tmp1, this->pc));
-                } else {
-                    if (this->cycle == 1) {
-                        const auto reg_name = decode_reg8_name(this->tmp1 & 0x7);
-                        const auto bit      = (this->tmp1 >> 3) & 0x7;
-
-                        logging::debug(fmt::format("RES {}, {}\n", bit, reg_name));
-                        auto &reg = decode_reg8(this->tmp1 & 0x7);
-                        reg &= ~(1 << bit);
-
-                        logging::debug(fmt::format("\t\t\t\t\t\t\t\t\t Resetting bit {} of register {} = ${:02X}\n",
-                                        bit,
-                                        reg_name,
-                                        reg));
-                        this->pc += 2;
-                        this->cycle = 0;
-                    }
-                }
-            } else if ((this->tmp1 & 0b11000000) == 0b11000000) { // SET <bit>, r
-                if ((this->tmp1 & 0x7) == 0x6) {                  // SET <bit>, (HL)
-                    logging::debug(fmt::format("???\n"));
-                    throw std::runtime_error(
-                        fmt::format("UNKNOWN EXTENDED OPCODE ${:02X} at PC=${:04X}", this->tmp1, this->pc));
-                } else {
-                    if (this->cycle == 1) {
-                        const auto reg_name = decode_reg8_name(this->tmp1 & 0x7);
-                        const auto bit      = (this->tmp1 >> 3) & 0x7;
-
-                        logging::debug(fmt::format("SET {}, {}\n", bit, reg_name));
-                        auto &reg = decode_reg8(this->tmp1 & 0x7);
-                        reg |= (1 << bit);
-
-                        logging::debug(fmt::format("\t\t\t\t\t\t\t\t\t Setting bit {} of register {} = ${:02X}\n",
-                                        bit,
-                                        reg_name,
-                                        reg));
+                        logging::debug(
+                            fmt::format("\t\t\t\t\t\t\t\t\t {} of {} = ${:02X}\n", instr_desc, reg_name, reg));
                         this->pc += 2;
                         this->cycle = 0;
                     }
@@ -1833,7 +1719,8 @@ void Cpu::do_tick(uint64_t clock, IBus &bus, InterruptState &int_state) {
                         this->flag_n   = false;
                         this->flag_h   = true;
 
-                        logging::debug(fmt::format("\t\t\t\t\t\t\t\t\t Testing bit {} of memory location (HL)=${:04X} = ${:02X}\n",
+                        logging::debug(
+                            fmt::format("\t\t\t\t\t\t\t\t\t Testing bit {} of memory location (HL)=${:04X} = ${:02X}\n",
                                         bit,
                                         this->hl.r16,
                                         op));
@@ -1852,9 +1739,61 @@ void Cpu::do_tick(uint64_t clock, IBus &bus, InterruptState &int_state) {
                         this->flag_h    = true;
 
                         logging::debug(fmt::format("\t\t\t\t\t\t\t\t\t Testing bit {} of register {} = ${:02X}\n",
-                                        bit,
-                                        reg_name,
-                                        reg));
+                                                   bit,
+                                                   reg_name,
+                                                   reg));
+                        this->pc += 2;
+                        this->cycle = 0;
+                    }
+                }
+            } else if ((this->tmp1 & 0b10000000) == 0b10000000) { // RES/SET
+
+                const int reg_index = this->tmp1 & 0x7;
+                const auto bit      = (this->tmp1 >> 3) & 0x7;
+
+                const bool set_not_reset = (this->tmp1 & 0b01000000) != 0;
+
+                const auto instr_name = set_not_reset ? "SET" : "RES";
+                const auto instr_desc = set_not_reset ? "Setting" : "Resetting";
+
+                if (reg_index == 0x06) {
+                    if (this->cycle == 1) {
+                        logging::debug(fmt::format("{} {}, (HL) \n", instr_name, bit));
+                        this->cycle++;
+                    } else if (this->cycle == 2) {
+                        this->tmp2 = bus.read(this->hl.r16);
+                        this->cycle++;
+                    } else if (this->cycle == 3) {
+                        const uint8_t newval = set_not_reset ? this->tmp2 | (1 << bit) : this->tmp2 & ~(1 << bit);
+                        bus.write(this->hl.r16, newval);
+
+                        logging::debug(fmt::format("\t\t\t\t\t\t\t\t\t {} bit {} of (HL) (${:04X}) = ${:02X}\n",
+                                                   instr_desc,
+                                                   bit,
+                                                   this->hl.r16,
+                                                   newval));
+
+                        this->pc += 2;
+                        this->cycle = 0;
+                    }
+                } else {
+                    if (this->cycle == 1) {
+                        const auto reg_name = decode_reg8_name(reg_index);
+
+                        logging::debug(fmt::format("{} {}, {}\n", instr_name, bit, reg_name));
+                        auto &reg = decode_reg8(reg_index);
+
+                        if (set_not_reset) {
+                            reg |= (1 << bit);
+                        } else {
+                            reg &= ~(1 << bit);
+                        }
+
+                        logging::debug(fmt::format("\t\t\t\t\t\t\t\t\t {} bit {} of register {} = ${:02X}\n",
+                                                   instr_desc,
+                                                   bit,
+                                                   reg_name,
+                                                   reg));
                         this->pc += 2;
                         this->cycle = 0;
                     }
