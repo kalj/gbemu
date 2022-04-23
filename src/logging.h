@@ -4,6 +4,8 @@
 #include <fmt/core.h>
 #include <string>
 
+#define LOGGING_ENABLED
+
 namespace logging {
 
     enum class LogLevel {
@@ -15,16 +17,22 @@ namespace logging {
     void set_level(LogLevel lvl);
     LogLevel get_level();
 
-    static inline void debug(const std::string &s) {
+    template <typename... Ts>
+    static inline void debug(Ts... args) {
+#ifdef LOGGING_ENABLED
         if (get_level() >= LogLevel::DEBUG) {
-            fmt::print(s);
+            fmt::print(args...);
         }
+#endif
     }
 
-    static inline void warning(const std::string &s) {
+    template <typename... T>
+    static inline void warning(T... args) {
+#ifdef LOGGING_ENABLED
         if (get_level() >= LogLevel::WARNING) {
-            fmt::print(s);
+            fmt::print(args...);
         }
+#endif
     }
 } // namespace logging
 

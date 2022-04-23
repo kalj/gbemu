@@ -70,7 +70,7 @@ public:
 
     void write_mbc(uint16_t addr, uint8_t data) override {
         // throw std::runtime_error(fmt::format("Invalid write to MBC of ${:02X} at ${:04X} for cartridge type ${:02X} ({})", data, addr, this->type, to_string(this->type)));
-        logging::warning(fmt::format("Invalid write to NullMc of ${:02X} at ${:04X}", data, addr));
+        logging::warning("Invalid write to NullMc of ${:02X} at ${:04X}", data, addr);
     }
 
     uint8_t read_rom(uint16_t addr) const override {

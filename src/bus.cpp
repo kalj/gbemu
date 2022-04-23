@@ -32,32 +32,30 @@ Bus::Bus(Cartridge &cart,
 
 uint8_t Bus::read(uint16_t addr) const {
     uint8_t data = 0xff;
-    std::string desc = "";
     if(addr < 0x8000) {
-        desc = "ROM";
         data = this->cartridge.read_rom(addr);
+        logging::debug("        BUS [${:04X}] -> ${:02X} (ROM)\n", addr, data);
     } else if(addr < 0xa000) {
-        desc = "VRAM";
         data = this->vram[addr-0x8000];
+        logging::debug("        BUS [${:04X}] -> ${:02X} (VRAM)\n", addr, data);
     } else if(addr < 0xc000) {
-        desc = "Cartridge RAM";
         data = this->cartridge.read_ram(addr-0xa000);
+        logging::debug("        BUS [${:04X}] -> ${:02X} (Cartridge RAM)\n", addr, data);
     } else if(addr < 0xe000) {
-        desc = "WRAM";
         data = this->wram[addr-0xc000];
+        logging::debug("        BUS [${:04X}] -> ${:02X} (WRAM)\n", addr, data);
     } else if(addr < 0xfe00) {
-        desc = "ECHO RAM";
         data = this->wram[addr-0xe000];
+        logging::debug("        BUS [${:04X}] -> ${:02X} (ECHO RAM)\n", addr, data);
     } else if(addr < 0xfea0) {
-        desc = "OAM";
         data = this->ppu.read_oam(addr-0xfe00);
+        logging::debug("        BUS [${:04X}] -> ${:02X} (OAM)\n", addr, data);
     } else if(addr < 0xff00) {
         throw std::runtime_error(fmt::format("INVALID BUS READ AT ${:04X} (prohibited area)", addr));
     } else if(addr == 0xff0f || addr == 0xffff) {
-        desc = "InterruptState";
         data = this->int_state.read_reg(addr-0xff00);
+        logging::debug("        BUS [${:04X}] -> ${:02X} (Interrupt State)\n", addr, data);
     } else if(addr < 0xff80) {
-        desc = "IO";
         const uint8_t regid = addr-0xff00;
         if(regid == 0x00) {
             data = this->controller.read_reg();
@@ -70,47 +68,47 @@ uint8_t Bus::read(uint16_t addr) const {
         } else if(regid >= 0x40 && regid <= 0x4b) {
             data = this->ppu.read_reg(regid);
         } else {
-            logging::warning(fmt::format("=====================================================================\n"));
-            logging::warning(fmt::format("   WARNING: INVALID IO REGISTER READ AT ${:04X}\n", addr));
-            logging::warning(fmt::format("=====================================================================\n"));
+            logging::warning("=====================================================================\n");
+            logging::warning("   WARNING: INVALID IO REGISTER READ AT ${:04X}\n", addr);
+            logging::warning("=====================================================================\n");
         }
+        logging::debug("        BUS [${:04X}] -> ${:02X} (IO)\n", addr, data);
     } else { // 0xff80 - 0xfffe
-        desc = "HRAM";
         data = this->hram[addr-0xff80];
+        logging::debug("        BUS [${:04X}] -> ${:02X} (HRAM)\n", addr, data);
     }
-    logging::debug(fmt::format("        BUS [${:04X}] -> ${:02X} ({})\n", addr, data, desc));
     return data;
 }
 
 void Bus::write(uint16_t addr, uint8_t data) {
-    std::string desc = "";
     if(addr < 0x8000) {
-        desc = "MBC";
+        logging::debug("        BUS [${:04X}] <- ${:02X}  (MBC)", addr, data);
         this->cartridge.write_mbc(addr, data);
     } else if(addr < 0xa000) {
-        desc = "VRAM";
+        logging::debug("        BUS [${:04X}] <- ${:02X}  (VRAM)", addr, data);
         this->vram[addr-0x8000] = data;
     } else if(addr < 0xc000) {
+        logging::debug("        BUS [${:04X}] <- ${:02X}  (Cartridge RAM)", addr, data);
         this->cartridge.write_ram(addr-0xa000, data);
     } else if(addr < 0xe000) {
-        desc = "WRAM";
+        logging::debug("        BUS [${:04X}] <- ${:02X}  (WRAM)", addr, data);
         this->wram[addr-0xc000] = data;
     } else if(addr < 0xfe00) {
-        desc = "ECHO RAM";
+        logging::debug("        BUS [${:04X}] <- ${:02X}  (ECHO RAM)", addr, data);
         this->wram[addr-0xe000] = data;
     } else if(addr < 0xfea0) {
-        desc = "OAM";
+        logging::debug("        BUS [${:04X}] <- ${:02X}  (OAM)", addr, data);
         this->ppu.write_oam(addr-0xfe00,data);
     } else if(addr < 0xff00) {
-        logging::warning(fmt::format("=====================================================================\n"));
-        logging::warning(fmt::format("   WARNING: INVALID BUS WRITE AT ${:04X} (prohibited area), data=${:02X}\n", addr, data));
-        logging::warning(fmt::format("=====================================================================\n"));
+        logging::warning("=====================================================================\n");
+        logging::warning("   WARNING: INVALID BUS WRITE AT ${:04X} (prohibited area), data=${:02X}\n", addr, data);
+        logging::warning("=====================================================================\n");
         return;
     } else if(addr == 0xff0f || addr == 0xffff) {
-        desc = "InterruptState";
+        logging::debug("        BUS [${:04X}] <- ${:02X}  (InterruptState)", addr, data);
         this->int_state.write_reg(addr-0xff00, data);
     } else if(addr < 0xff80) {
-        desc = "IO";
+        logging::debug("        BUS [${:04X}] <- ${:02X}  (IO)", addr, data);
         const uint8_t regid = addr-0xff00;
         if(regid == 0x00) {
             this->controller.write_reg(data);
@@ -123,16 +121,15 @@ void Bus::write(uint16_t addr, uint8_t data) {
         } else if(regid >= 0x40 && regid <= 0x4b) {
             this->ppu.write_reg(regid, data);
         } else {
-            logging::warning(fmt::format("=====================================================================\n"));
-            logging::warning(fmt::format("   WARNING: INVALID IO REGISTER WRITE AT ${:04X} data=${:02X}\n", addr, data));
-            logging::warning(fmt::format("=====================================================================\n"));
+            logging::warning("=====================================================================\n");
+            logging::warning("   WARNING: INVALID IO REGISTER WRITE AT ${:04X} data=${:02X}\n", addr, data);
+            logging::warning("=====================================================================\n");
             return;
         }
     } else { // 0xff80 - 0xfffe
-        desc = "HRAM";
+        logging::debug("        BUS [${:04X}] <- ${:02X}  (HRAM)", addr, data);
         this->hram[addr-0xff80] = data;
     }
-    logging::debug(fmt::format("        BUS [${:04X}] <- ${:02X}  ({})\n", addr, data, desc));
 }
 
 void Bus::dump(std::ostream &os) const {

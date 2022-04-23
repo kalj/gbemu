@@ -83,7 +83,7 @@ void Ppu::write_reg(uint8_t regid, uint8_t data) {
 
         case 0x46:
             this->dma_src_base = static_cast<uint16_t>(data) << 8;
-            logging::debug(fmt::format("Starting DMA from ${:04X}\n", this->dma_src_base));
+            logging::debug("Starting DMA from ${:04X}\n", this->dma_src_base);
             this->dma_n_bytes_left = OAM_SIZE;
             break;
 
@@ -150,9 +150,9 @@ void Ppu::tick_dma(uint64_t clock, IBus &bus) {
     }
     // copy from high to low address...
     this->dma_n_bytes_left--;
-    logging::debug(fmt::format("\t\t\t\t\t\t\t\t Performing DMA transfer from ${:04X} to OAM at ${:04X}\n",
+    logging::debug("\t\t\t\t\t\t\t\t Performing DMA transfer from ${:04X} to OAM at ${:04X}\n",
                                this->dma_src_base + this->dma_n_bytes_left,
-                               this->dma_n_bytes_left + 0xfe00));
+                               this->dma_n_bytes_left + 0xfe00);
     this->oam[this->dma_n_bytes_left] = bus.read(this->dma_src_base + this->dma_n_bytes_left);
 }
 
