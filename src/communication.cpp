@@ -3,6 +3,7 @@
 #include <fmt/core.h>
 
 // TODO: set interrupt (bit 3 in IF) appropriately
+Communication::Communication() : fs("communication_output.bin"){}
 
 uint8_t Communication::read_reg(uint8_t regid) const
 {
@@ -19,6 +20,7 @@ uint8_t Communication::read_reg(uint8_t regid) const
 void Communication::write_reg(uint8_t regid, uint8_t data) {
     switch(regid) {
     case 1:
+        fs << (char)data << std::flush;
         this->sb = data;
         break;
     case 2:
