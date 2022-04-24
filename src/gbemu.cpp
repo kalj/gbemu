@@ -14,16 +14,27 @@
 
 #include <SDL2/SDL.h>
 
+void audio_callback(void *user_data, Uint8 *raw_buffer, int bytes) {
+
+    Sint16   *buffer   = (Sint16 *)raw_buffer;
+    const int n_frames = bytes / N_CHANNELS / sizeof(int16_t);
+
+    Gameboy *gb = (Gameboy *)user_data;
+    gb->render_audio(buffer, n_frames);
+}
+
 int main(int argc, char **argv) {
 
     CLI::App app{"Gameboy Emulator"};
 
     std::filesystem::path rom_path;
-    bool verbose = false;
-    bool nowin   = false;
+    bool                  verbose = false;
+    bool                  no_sdl  = false;
     app.add_option("cartridge_rom", rom_path, "Path to cartridge rom file")->required()->check(CLI::ExistingFile);
     app.add_flag("-v,--verbose", verbose, "Enable verbose log output");
-    app.add_flag("-n,--nowin", nowin, "Disable launching SDL2 window");
+    app.add_flag("-n,--nosdl", no_sdl, "Disable SDL2 video and sound rendering");
+
+    const bool with_sdl = !no_sdl;
 
     CLI11_PARSE(app, argc, argv);
 
@@ -36,18 +47,20 @@ int main(int argc, char **argv) {
 
     std::vector<uint8_t> cartridge_rom_contents(std::istreambuf_iterator<char>(infile), {});
 
-    logging::set_level(verbose ? logging::LogLevel::DEBUG: logging::LogLevel::WARNING);
+    logging::set_level(verbose ? logging::LogLevel::DEBUG : logging::LogLevel::WARNING);
 
     Gameboy gb{cartridge_rom_contents};
     gb.reset();
 
     gb.print_cartridge_info();
 
-    SDL_Window *window          = NULL;
-    SDL_Renderer *renderer      = NULL;
-    SDL_Texture *screen_texture = NULL;
-    if (!nowin) {
-        SDL_Init(SDL_INIT_VIDEO);
+    SDL_Window   *window         = NULL;
+    SDL_Renderer *renderer       = NULL;
+    SDL_Texture  *screen_texture = NULL;
+    if (with_sdl) {
+        if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) != 0) {
+            throw std::runtime_error(fmt::format("Failed to initialize SDL: {}", SDL_GetError()));
+        }
 
         window = SDL_CreateWindow("GbEmu",
                                   SDL_WINDOWPOS_CENTERED,
@@ -68,26 +81,43 @@ int main(int argc, char **argv) {
 
         screen_texture =
             SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STREAMING, LCD_WIDTH, LCD_HEIGHT);
+
+        SDL_AudioSpec desired;
+        desired.freq     = SAMPLE_RATE;  // number of samples per second
+        desired.format   = AUDIO_S16SYS; // sample type (here: signed short i.e. 16 bit)
+        desired.channels = N_CHANNELS;
+        desired.samples  = 2048; // buffer-size
+        desired.callback = audio_callback;
+        desired.userdata = &gb;
+
+        SDL_AudioSpec obtained;
+        if (SDL_OpenAudio(&desired, &obtained) != 0) {
+            SDL_LogError(SDL_LOG_CATEGORY_AUDIO, "Failed to open audio: %s", SDL_GetError());
+        }
+        if (desired.format != obtained.format) {
+            SDL_LogError(SDL_LOG_CATEGORY_AUDIO, "Failed to get the desired AudioSpec");
+        }
+        SDL_PauseAudio(0);
     }
 
     fmt::print("------------------------------------------------------\n");
     fmt::print("Starting execution\n\n");
 
-    int res  = 0;
+    int  res = 0;
     auto tic = std::chrono::high_resolution_clock::now();
     try {
         bool running = true;
-        int i        = 0;
+        int  i       = 0;
         while (running) {
 
-            if (!nowin) {
+            if (with_sdl) {
                 SDL_Event event;
                 while (SDL_PollEvent(&event)) {
                     if (event.type == SDL_QUIT) {
                         running = false;
-                    } else if(event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE) {
-                            running = false;
-                    } else if(event.type == SDL_KEYDOWN || event.type == SDL_KEYUP) {
+                    } else if (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE) {
+                        running = false;
+                    } else if (event.type == SDL_KEYDOWN || event.type == SDL_KEYUP) {
                         const gb_controller::State new_state =
                             event.type == SDL_KEYDOWN ? gb_controller::State::DOWN : gb_controller::State::UP;
 
@@ -112,7 +142,8 @@ int main(int argc, char **argv) {
                 }
             }
 
-            const auto cycles_to_execute = 154 * 456 * 4;
+            // const auto cycles_to_execute = 154 * 456 * 4;
+            const auto cycles_to_execute = 154 * 110 * 4;
             for (int j = 0; j < cycles_to_execute; j++) {
                 gb.do_tick();
             }
@@ -126,7 +157,7 @@ int main(int argc, char **argv) {
                 tic = toc;
             }
 
-            if (!nowin) {
+            if (with_sdl) {
                 // It's a good idea to clear the screen every frame,
                 // as artifacts may occur if the window overlaps with
                 // other windows or transparent overlays.
@@ -141,7 +172,8 @@ int main(int argc, char **argv) {
         res = 1;
     }
 
-    if (!nowin) {
+    if (with_sdl) {
+        // SDL_CloseAudio();
         SDL_Quit();
     }
 

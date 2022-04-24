@@ -31,6 +31,10 @@ public:
         this->controller.set_button_state(button, state);
     }
 
+    void render_audio(int16_t *buffer, int n_frames) {
+        this->sound.render(buffer, n_frames);
+    }
+
     void dump(std::ostream &os) const;
 
 private:
