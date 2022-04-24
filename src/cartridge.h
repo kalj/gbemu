@@ -24,7 +24,7 @@ enum class CartridgeType : uint8_t {
     ROM_MBC3_RAM             = 0x12,
     ROM_MBC3_RAM_BATT        = 0x13,
     ROM_MBC5                 = 0x19,
-    ROM_MBC5_RAM_            = 0x1a,
+    ROM_MBC5_RAM             = 0x1a,
     ROM_MBC5_RAM_BATT        = 0x1b,
     ROM_MBC5_RUMBLE          = 0x1c,
     ROM_MBC5_RUMBLE_RAM      = 0x1d,
@@ -45,31 +45,31 @@ public:
     ~Cartridge();
 
     // getters
-    int get_ram_size() const;
-    int get_rom_size() const;
-    int get_ram_banks() const;
-    int get_rom_banks() const;
+    int         get_ram_size() const;
+    int         get_rom_size() const;
+    int         get_ram_banks() const;
+    int         get_rom_banks() const;
     std::string get_type_str() const;
     std::string get_title() const;
-    uint8_t get_cgb_flag() const;
-    uint8_t get_sgb_flag() const;
-    uint8_t get_mask_rom_version() const;
-    uint8_t get_destination_code() const;
+    uint8_t     get_cgb_flag() const;
+    uint8_t     get_sgb_flag() const;
+    uint8_t     get_mask_rom_version() const;
+    uint8_t     get_destination_code() const;
     std::string get_licensee_code() const;
 
     // bus operations
     uint8_t read_rom(uint16_t addr) const;
-    void write_mbc(uint16_t addr, uint8_t data);
+    void    write_mbc(uint16_t addr, uint8_t data);
     uint8_t read_ram(uint16_t addr) const;
-    void write_ram(uint16_t addr, uint8_t data);
+    void    write_ram(uint16_t addr, uint8_t data);
 
     void dump_ram(std::ostream &os);
 
 private:
-    std::unique_ptr<Mbc> mbc;
+    std::unique_ptr<Mbc>        mbc;
     const std::vector<uint8_t> &rom;
-    CartridgeType type{CartridgeType::ROM_ONLY};
-    std::vector<uint8_t> ram;
+    CartridgeType               type{CartridgeType::ROM_ONLY};
+    std::vector<uint8_t>        ram;
 };
 
 #endif /* CARTRIDGE_H */
