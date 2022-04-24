@@ -2,6 +2,7 @@
 # Reference:
 #   http://releases.llvm.org/9.0.0/tools/clang/docs/ClangFormatStyleOptions.html
 BasedOnStyle: Google
+AlignConsecutiveDeclarations: true
 AlignConsecutiveAssignments: true
 AlignConsecutiveMacros: true
 AllowShortFunctionsOnASingleLine: None
