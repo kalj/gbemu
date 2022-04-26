@@ -12,7 +12,7 @@
 
 #include <fmt/core.h>
 
-Bus::Bus(Cartridge &cart, gb_controller::Controller &cntl, Communication &comm, DivTimer &dt, Sound &snd, Ppu &ppu, InterruptState &is)
+Bus::Bus(Cartridge &cart, gb_controller::Controller &cntl, Communication &comm, DivTimer &dt, gb_sound::Sound &snd, Ppu &ppu, InterruptState &is)
     : vram(8 * 1024, 0xff),
       wram(8 * 1024, 0xff),
       hram(127, 0xff),

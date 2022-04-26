@@ -41,7 +41,7 @@ private:
     uint64_t clock{0};
     Cartridge cartridge;
     Cpu cpu;
-    Sound sound;
+    gb_sound::Sound sound;
     gb_controller::Controller controller;
     Communication communication;
     DivTimer div_timer;

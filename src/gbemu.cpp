@@ -15,9 +15,8 @@
 #include <SDL2/SDL.h>
 
 void audio_callback(void *user_data, Uint8 *raw_buffer, int bytes) {
-
     Sint16   *buffer   = (Sint16 *)raw_buffer;
-    const int n_frames = bytes / N_CHANNELS / sizeof(int16_t);
+    const int n_frames = bytes / gb_sound::N_CHANNELS / sizeof(int16_t);
 
     Gameboy *gb = (Gameboy *)user_data;
     gb->render_audio(buffer, n_frames);
@@ -83,10 +82,10 @@ int main(int argc, char **argv) {
             SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STREAMING, LCD_WIDTH, LCD_HEIGHT);
 
         SDL_AudioSpec desired;
-        desired.freq     = SAMPLE_RATE;  // number of samples per second
-        desired.format   = AUDIO_S16SYS; // sample type (here: signed short i.e. 16 bit)
-        desired.channels = N_CHANNELS;
-        desired.samples  = 2048; // buffer-size
+        desired.freq     = gb_sound::SAMPLE_RATE; // number of samples per second
+        desired.format   = AUDIO_S16SYS;          // sample type (here: signed short i.e. 16 bit)
+        desired.channels = gb_sound::N_CHANNELS;
+        desired.samples  = gb_sound::BLOCK_SIZE; // buffer-size
         desired.callback = audio_callback;
         desired.userdata = &gb;
 
