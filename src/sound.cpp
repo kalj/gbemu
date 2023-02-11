@@ -257,6 +257,7 @@ namespace gb_sound {
                 this->ch1_freq = (this->ch1_freq & 0x700) | data;
                 break;
             case REG_NR14:
+                this->ch1_freq                = (static_cast<uint16_t>(data & 0x7) << 8) | (this->ch1_freq & 0xff);
                 this->ch1_counter_consecutive = data & (1 << 6);
                 if (data & (1 << 7)) {
                     this->ch1_initial = true;
