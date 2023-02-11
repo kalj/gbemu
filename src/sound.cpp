@@ -87,52 +87,75 @@ namespace gb_sound {
     }
 
     void Sound::render(int16_t *buffer, int n_frames) {
-        memset(buffer, 0, n_frames * N_CHANNELS * sizeof(int16_t));
 
         if (!this->master_on) {
+            memset(buffer, 0, n_frames * N_CHANNELS * sizeof(int16_t));
             return;
         }
 
-        const int16_t AMPLITUDE = 0x1000;
-
         // channel 1
         const float    ch1_frequency = float(131072) / (2048 - this->ch1_freq);
-        const uint32_t ch1_dphase    = ch1_frequency / SAMPLE_RATE * UINT32_MAX;
-
-        if (this->ch1_initial) {
-            this->ch1_initial = false;
-            this->ch1_active  = true;
-        }
-
-        if ((this->channel_matrix & 0x11) && this->ch1_active) {
-            for (int i = 0; i < n_frames; i++) {
-                buffer[N_CHANNELS * i + 0] = (this->ch1_phase < 0x80000000U) ? AMPLITUDE : -AMPLITUDE;
-                this->ch1_phase += ch1_dphase;
-            }
-        }
-
-        if (this->ch2_initial) {
-            this->ch2_initial = false;
-            this->ch2_active  = true;
-        }
+        const uint32_t ch1_dphase    = ch1_frequency / SAMPLE_RATE * static_cast<float>(UINT32_MAX);
 
         // channel 2
         const float    ch2_frequency = float(131072) / (2048 - this->ch2_freq);
-        const uint32_t ch2_dphase    = ch2_frequency / SAMPLE_RATE * UINT32_MAX;
+        const uint32_t ch2_dphase    = ch2_frequency / SAMPLE_RATE * static_cast<float>(UINT32_MAX);
 
-        if ((this->channel_matrix & 0x22) && this->ch2_active) {
-            for (int i = 0; i < n_frames; i++) {
-                buffer[N_CHANNELS * i + 1] = (this->ch2_phase < 0x80000000U) ? AMPLITUDE : -AMPLITUDE;
+        const int8_t ch1_vol = ch1_env_initial_vol;
+        const int8_t ch2_vol = ch2_env_initial_vol;
+
+        for (int i = 0; i < n_frames; i++) {
+
+            int16_t ch1val = 0;
+            if (this->ch1_length > 0) {
+                const int16_t amplitude = ch1_vol * 136; // [0.033211235,0.4981685]  in Q12
+                                                         // [0.06640625, 0.99609375] in Q11
+                ch1val = (this->ch1_phase < 0x80000000U) ? amplitude : -amplitude;
+                this->ch1_phase += ch1_dphase;
+            }
+
+            int16_t ch2val = 0;
+            if (this->ch2_length > 0) {
+                const int16_t amplitude = ch2_vol * 136; // [0.033211235,0.4981685]  in Q12
+                                                         // [0.06640625, 0.99609375] in Q11
+                ch2val = (this->ch2_phase < 0x80000000U) ? amplitude : -amplitude;
                 this->ch2_phase += ch2_dphase;
             }
-        }
 
-        // this->so1_vol+1
-        // for(int i=0; i<n_frames; i++) {
-        //     for(int ch=0; ch<N_CHANNELS; ch++) {
-        //         buffer[N_CHANNELS*i + ch] = i<(n_frames/2) ? 0x1000: -0x1000;
-        //     }
-        // }
+            // left output
+
+            // At most 2x individual channel values ->
+            // [0, 0.99609375] in Q12
+            int16_t leftval = 0;
+
+            if (this->channel_matrix & 0x1) {
+                leftval += ch1val;
+            }
+            if (this->channel_matrix & 0x2) {
+                leftval += ch2val;
+            }
+
+            // so1_vol ~ 0-7 , mult by (so1_vol+1) ->
+            // [0, 0.99609375] in Q15
+
+            // From https://gbdev.gg8.se/wiki/articles/Gameboy_sound_hardware
+            // The mixed left/right signals go to the left/right master volume controls. These multiply the signal by
+            // (volume+1). The volume step relative to the channel DAC is such that a single channel enabled via NR51
+            // playing at volume of 2 with a master volume of 7 is about as loud as that channel playing at volume 15
+            // with a master volume of 0.
+
+            buffer[N_CHANNELS * i + 0] = (this->so1_vol + 1) * leftval;
+
+            // right output
+            int16_t rightval = 0;
+            if (this->channel_matrix & 0x10) {
+                rightval += ch1val;
+            }
+            if (this->channel_matrix & 0x20) {
+                rightval += ch2val;
+            }
+            buffer[N_CHANNELS * i + 1] = (this->so2_vol + 1) * rightval;
+        }
     }
 
     uint8_t Sound::read_reg(uint8_t regid) const {
