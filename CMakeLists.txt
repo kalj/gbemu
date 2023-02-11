@@ -4,6 +4,11 @@ project(gbemu CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 
+option(LOGGING_ENABLED "Use logging" OFF)
+if(LOGGING_ENABLED)
+    add_compile_definitions(LOGGING_ENABLED=)
+endif()
+
 add_compile_options(-Wall -Wpedantic -Werror)
 
 # add compiler output coloring also for ninja

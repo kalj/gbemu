@@ -4,8 +4,6 @@
 #include <fmt/core.h>
 #include <string>
 
-#define LOGGING_ENABLED
-
 namespace logging {
 
     enum class LogLevel {
