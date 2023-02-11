@@ -28,6 +28,10 @@
 #define COUNTER_WIDTH_7BITS  true
 #define COUNTER_WIDTH_15BITS false
 
+constexpr uint64_t CLK_DIV_64HZ  = (1 << 22) / (1 << 6);
+constexpr uint64_t CLK_DIV_128HZ = (1 << 22) / (1 << 7);
+constexpr uint64_t CLK_DIV_256HZ = (1 << 22) / (1 << 8);
+
 namespace gb_sound {
 
     void Sound::reset() {
@@ -49,6 +53,37 @@ namespace gb_sound {
         this->write_reg(REG_NR50, 0x77);
         this->write_reg(REG_NR51, 0xF3);
         this->write_reg(REG_NR52, 0xF1); //($F0-SGB)
+    }
+
+    void Sound::do_tick(uint64_t clock) {
+        if (!this->master_on) {
+            return;
+        }
+
+        // length ctr - 256 Hz
+        if ((clock & (CLK_DIV_256HZ - 1)) == 0) {
+
+            // decrement len counter
+            // if reaches 0, disable channel
+
+            // channel 1
+            if (this->ch1_counter_consecutive && this->ch1_length > 0) {
+                this->ch1_length--;
+            }
+
+            // channel 2
+            if (this->ch2_counter_consecutive && this->ch2_length > 0) {
+                this->ch2_length--;
+            }
+        }
+
+        // sweep - 128 Hz
+        if ((clock & (CLK_DIV_128HZ - 1)) == 0) {
+        }
+
+        // vol env - 64 Hz
+        if ((clock & (CLK_DIV_64HZ - 1)) == 0) {
+        }
     }
 
     void Sound::render(int16_t *buffer, int n_frames) {

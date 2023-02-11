@@ -13,6 +13,8 @@ namespace gb_sound {
     public:
         void reset();
 
+        void do_tick(uint64_t clock);
+
         void render(int16_t *buffer, int n_frames);
 
         uint8_t read_reg(uint8_t regid) const;

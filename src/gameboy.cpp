@@ -60,6 +60,8 @@ void Gameboy::do_tick() {
 
     this->div_timer.do_tick(this->clock, this->interrupt_state);
 
+    this->sound.do_tick(this->clock);
+
     this->clock++;
 }
 
