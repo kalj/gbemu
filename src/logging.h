@@ -15,20 +15,20 @@ namespace logging {
     void set_level(LogLevel lvl);
     LogLevel get_level();
 
-    template <typename... Ts>
-    static inline void debug(Ts... args) {
+    template <typename... Args>
+    static inline void debug(fmt::format_string<Args...> s, Args&&... args) {
 #ifdef LOGGING_ENABLED
         if (get_level() >= LogLevel::DEBUG) {
-            fmt::print(args...);
+            fmt::print(s, std::forward<Args>(args)...);
         }
 #endif
     }
 
-    template <typename... T>
-    static inline void warning(T... args) {
+    template <typename... Args>
+    static inline void warning(fmt::format_string<Args...> s, Args&&... args) {
 #ifdef LOGGING_ENABLED
         if (get_level() >= LogLevel::WARNING) {
-            fmt::print(args...);
+            fmt::print(s, std::forward<Args>(args)...);
         }
 #endif
     }
