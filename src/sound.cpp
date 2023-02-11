@@ -188,7 +188,7 @@ namespace gb_sound {
                 break;
             case REG_NR11:
                 this->ch1_duty   = (data >> 6) & 0x3;
-                this->ch1_length = data & 0x1f;
+                this->ch1_length = 64 - (data & 0x3f);
                 break;
             case REG_NR12:
                 this->ch1_env_n_steps      = data & 0x7;
@@ -207,7 +207,7 @@ namespace gb_sound {
 
             case REG_NR21:
                 this->ch2_duty   = (data >> 6) & 0x3;
-                this->ch2_length = data & 0x1f;
+                this->ch2_length = 64 - (data & 0x3f);
                 break;
             case REG_NR22:
                 this->ch2_env_n_steps      = data & 0x7;
@@ -229,7 +229,7 @@ namespace gb_sound {
                 this->ch3_on = data & 0x80;
                 break;
             case REG_NR31:
-                this->ch3_length = data;
+                this->ch3_length = 256 - data;
                 break;
             case REG_NR32:
                 this->ch3_level = (data >> 5) & 0x3;
@@ -246,7 +246,7 @@ namespace gb_sound {
                 break;
 
             case REG_NR41:
-                this->ch4_length = data & 0x3f;
+                this->ch4_length = 64 - (data & 0x3f);
                 break;
             case REG_NR42:
                 this->ch4_env_n_steps      = data & 0x7;
