@@ -28,7 +28,7 @@ KeepEmptyLinesAtTheStartOfBlocks: true
 IncludeBlocks: Preserve
 IndentWidth: 4
 
-ReflowComments: false
+ReflowComments: true
 SpacesBeforeTrailingComments: 1
 
 NamespaceIndentation: All
